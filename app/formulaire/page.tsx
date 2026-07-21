@@ -489,8 +489,7 @@ export default function Formulaire() {
                                     />
                                     <span className="flex-1">
                                         <span className="font-semibold text-ink text-sm sm:text-base">
-                                            🚗 Option Luxe — Voiture privée avec chauffeur
-                                        </span>
+                                            🚗 Option Luxe — Voiture privée                                         </span>
                                         <br />
                                         <span className="text-xs sm:text-sm text-ink/60">
                                             + 25€ par personne
@@ -545,7 +544,7 @@ export default function Formulaire() {
                         <div className="bg-sand/40 rounded-2xl p-4 text-sm text-ink/70 leading-relaxed mt-4">
                             <p className="font-semibold text-ink mb-1">💶 Tarification</p>
                             <p>
-                                Le service est proposé au tarif de <strong>85€ par personne</strong> pour
+                                Le service est proposé au tarif de <strong>85€ par personne  </strong> pour
                                 une journée complète d&apos;accompagnement (hors frais de transport, de
                                 restauration et billets d&apos;entrée des sites visités).
                             </p>
