@@ -77,7 +77,7 @@ export default function Home() {
         </p>
 
         <p className="relative z-10 text-sunshine mt-8 text-sm font-medium">
-          ⏱️ Ça prend seulement quelques minutes 💌
+          ⏱️ Ça  prend seulement quelques minutes 💌
         </p>
       </div>
     </main>
