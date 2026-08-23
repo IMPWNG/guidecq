@@ -9,9 +9,11 @@ import {
     Download,
     Mail,
     Phone,
+    Plus,
     Trash2,
     Users,
     Wallet,
+    X,
 } from 'lucide-react';
 
 const UNIT_PRICE = 85;
@@ -50,6 +52,7 @@ interface TourRequest {
     option_voiture_privee: boolean;
     status: StatusType;
     created_at: string;
+    jours_visite?: string[] | string | null;
 }
 
 type StatusType =
@@ -206,6 +209,39 @@ function startOfDay(date: Date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
+function toIsoDate(value: unknown): string | null {
+    if (!value || typeof value !== 'string') return null;
+    const iso = value.split('T')[0].trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
+
+function getVisitDays(request: Pick<TourRequest, 'jours_visite'>): string[] {
+    const raw = request.jours_visite;
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        if (trimmed.startsWith('[')) {
+            try {
+                const parsed = JSON.parse(trimmed);
+                return Array.isArray(parsed)
+                    ? parsed.map(toIsoDate).filter((day): day is string => Boolean(day))
+                    : [];
+            } catch {
+                return [];
+            }
+        }
+        return trimmed
+            .split(/[,;]/)
+            .map(toIsoDate)
+            .filter((day): day is string => Boolean(day));
+    }
+    if (Array.isArray(raw)) {
+        return raw.map(toIsoDate).filter((day): day is string => Boolean(day));
+    }
+    return [];
+}
+
 function formatLongDate(value: string) {
     const date = parseLocalDate(value);
     if (!date) return '—';
@@ -215,6 +251,14 @@ function formatLongDate(value: string) {
         month: 'short',
         year: 'numeric',
     });
+}
+
+function formatVisitDays(days: string[]) {
+    if (days.length === 0) return 'À renseigner';
+    return [...days]
+        .sort()
+        .map((day) => formatLongDate(day))
+        .join(' · ');
 }
 
 function stayDuration(arrivee: string, depart: string) {
@@ -237,6 +281,21 @@ function getTourPhase(request: TourRequest): TourPhase {
     if (request.status === 'termine') return 'finished';
 
     const today = startOfDay(new Date());
+    const visitDays = getVisitDays(request)
+        .map((day) => parseLocalDate(day))
+        .filter((day): day is Date => Boolean(day))
+        .map(startOfDay)
+        .sort((a, b) => a.getTime() - b.getTime());
+
+    if (visitDays.length > 0) {
+        const first = visitDays[0];
+        const last = visitDays[visitDays.length - 1];
+        if (last < today) return 'finished';
+        if (visitDays.some((day) => day.getTime() === today.getTime())) return 'ongoing';
+        if (first > today) return 'upcoming';
+        return 'upcoming';
+    }
+
     const arrivee = parseLocalDate(request.date_arrivee);
     const depart = parseLocalDate(request.date_depart);
 
@@ -326,6 +385,35 @@ export default function AdminChongqing() {
         }
     };
 
+    const updateVisitDays = async (id: string, days: string[]) => {
+        setUpdatingId(id);
+        const sorted = [...new Set(days)].sort();
+        try {
+            const { error: updateError } = await supabase
+                .from('tour_requests')
+                .update({ jours_visite: sorted })
+                .eq('id', id);
+
+            if (updateError) {
+                alert(
+                    'Erreur: ' +
+                        updateError.message +
+                        '\n\nAjoute cette colonne dans Supabase si besoin :\nALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS jours_visite date[] DEFAULT \'{}\';'
+                );
+                return;
+            }
+
+            setRequests((prev) =>
+                prev.map((r) => (r.id === id ? { ...r, jours_visite: sorted } : r))
+            );
+        } catch (err) {
+            console.error('Erreur:', err);
+            alert('Erreur lors de la mise à jour des jours de visite');
+        } finally {
+            setUpdatingId(null);
+        }
+    };
+
     const deleteRequest = async (id: string) => {
         if (!confirm('Sûr de vouloir supprimer ?')) return;
 
@@ -390,8 +478,12 @@ export default function AdminChongqing() {
         return [...list].sort((a, b) => {
             const phaseDiff = PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase];
             if (phaseDiff !== 0) return phaseDiff;
-            const dateA = parseLocalDate(a.request.date_arrivee)?.getTime() ?? 0;
-            const dateB = parseLocalDate(b.request.date_arrivee)?.getTime() ?? 0;
+            const visitA = getVisitDays(a.request)[0];
+            const visitB = getVisitDays(b.request)[0];
+            const dateA =
+                parseLocalDate(visitA || a.request.date_arrivee)?.getTime() ?? 0;
+            const dateB =
+                parseLocalDate(visitB || b.request.date_arrivee)?.getTime() ?? 0;
             return dateA - dateB;
         });
     }, [enriched, filter]);
@@ -409,6 +501,7 @@ export default function AdminChongqing() {
             'Phase',
             'Arrivée',
             'Départ',
+            'Jours de visite',
             'Hébergement',
             'Mobilité',
             'Transport',
@@ -443,6 +536,7 @@ export default function AdminChongqing() {
             PHASE_LABEL[phase].label,
             request.date_arrivee,
             request.date_depart,
+            getVisitDays(request).join('; ') || '-',
             request.hebergement || '-',
             request.mobilite || '-',
             request.transport_prefere || '-',
@@ -632,6 +726,7 @@ export default function AdminChongqing() {
                                 request.date_depart
                             );
                             const participants = getParticipants(request);
+                            const visitDays = getVisitDays(request);
                             const expanded = expandedId === request.id;
                             const canMarkFinished =
                                 request.status !== 'termine' && request.status !== 'annule';
@@ -685,9 +780,23 @@ export default function AdminChongqing() {
                                             </div>
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                <div className="sm:col-span-2 lg:col-span-4">
+                                                    <InfoChip
+                                                        icon={<CalendarDays size={18} />}
+                                                        label="Jour(s) de visite"
+                                                        value={formatVisitDays(visitDays)}
+                                                        extra={
+                                                            visitDays.length === 0
+                                                                ? 'À ajouter à la main'
+                                                                : `${visitDays.length} jour${visitDays.length > 1 ? 's' : ''}`
+                                                        }
+                                                        emphasize={visitDays.length > 0}
+                                                        warn={visitDays.length === 0}
+                                                    />
+                                                </div>
                                                 <InfoChip
                                                     icon={<CalendarDays size={18} />}
-                                                    label="Dates"
+                                                    label="Séjour"
                                                     value={`${formatLongDate(request.date_arrivee)} → ${formatLongDate(request.date_depart)}`}
                                                     extra={duration ? `${duration} jour${duration > 1 ? 's' : ''}` : undefined}
                                                 />
@@ -713,6 +822,30 @@ export default function AdminChongqing() {
                                                     label="Acompte / solde"
                                                     value={formatEuro(pricing.deposit)}
                                                     extra={`Reste ${formatEuro(pricing.remaining)}`}
+                                                />
+                                            </div>
+
+                                            <div
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="bg-white border-2 border-ink/10 rounded-xl p-3"
+                                            >
+                                                <VisitDaysEditor
+                                                    days={visitDays}
+                                                    arrivee={request.date_arrivee}
+                                                    depart={request.date_depart}
+                                                    disabled={updatingId === request.id}
+                                                    onAdd={(day) =>
+                                                        updateVisitDays(request.id, [
+                                                            ...visitDays,
+                                                            day,
+                                                        ])
+                                                    }
+                                                    onRemove={(day) =>
+                                                        updateVisitDays(
+                                                            request.id,
+                                                            visitDays.filter((item) => item !== day)
+                                                        )
+                                                    }
                                                 />
                                             </div>
 
@@ -833,6 +966,9 @@ export default function AdminChongqing() {
                                             </div>
 
                                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <DetailBox title="Jour(s) de visite">
+                                                    {formatVisitDays(visitDays)}
+                                                </DetailBox>
                                                 <DetailBox title="Arrivée">
                                                     {formatLongDate(request.date_arrivee)}
                                                 </DetailBox>
@@ -1014,19 +1150,23 @@ function InfoChip({
     value,
     extra,
     emphasize = false,
+    warn = false,
 }: {
     icon: ReactNode;
     label: string;
     value: string;
     extra?: string;
     emphasize?: boolean;
+    warn?: boolean;
 }) {
     return (
         <div
             className={`rounded-xl p-3 border-2 ${
-                emphasize
-                    ? 'bg-emerald-50 border-emerald-300'
-                    : 'bg-ink/5 border-ink/10'
+                warn
+                    ? 'bg-amber-50 border-amber-400'
+                    : emphasize
+                      ? 'bg-emerald-50 border-emerald-300'
+                      : 'bg-ink/5 border-ink/10'
             }`}
         >
             <p className="text-xs font-bold uppercase tracking-wide text-ink/60 flex items-center gap-1.5 mb-1">
@@ -1039,6 +1179,83 @@ function InfoChip({
             {extra && (
                 <p className="text-sm font-medium text-ink/70 mt-0.5">{extra}</p>
             )}
+        </div>
+    );
+}
+
+function VisitDaysEditor({
+    days,
+    arrivee,
+    depart,
+    disabled,
+    onAdd,
+    onRemove,
+}: {
+    days: string[];
+    arrivee?: string;
+    depart?: string;
+    disabled: boolean;
+    onAdd: (day: string) => void;
+    onRemove: (day: string) => void;
+}) {
+    const [draft, setDraft] = useState('');
+    const min = toIsoDate(arrivee) || undefined;
+    const max = toIsoDate(depart) || undefined;
+    const sorted = [...days].sort();
+
+    const addDay = () => {
+        const day = toIsoDate(draft);
+        if (!day || days.includes(day) || disabled) return;
+        onAdd(day);
+        setDraft('');
+    };
+
+    return (
+        <div>
+            <p className="text-sm font-bold uppercase tracking-wide text-ink/70 mb-2">
+                Ajouter le jour exact de la visite
+            </p>
+            {sorted.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                    {sorted.map((day) => (
+                        <span
+                            key={day}
+                            className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-900 px-3 py-1.5 rounded-full font-bold text-sm"
+                        >
+                            {formatLongDate(day)}
+                            <button
+                                type="button"
+                                onClick={() => onRemove(day)}
+                                disabled={disabled}
+                                className="text-emerald-800 hover:text-red-600 disabled:opacity-50"
+                                title="Retirer ce jour"
+                            >
+                                <X size={16} />
+                            </button>
+                        </span>
+                    ))}
+                </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                    type="date"
+                    value={draft}
+                    min={min}
+                    max={max}
+                    onChange={(e) => setDraft(e.target.value)}
+                    disabled={disabled}
+                    className="border-2 border-ink/15 rounded-xl px-3 py-2 text-base font-medium text-ink w-full sm:w-auto"
+                />
+                <button
+                    type="button"
+                    onClick={addDay}
+                    disabled={disabled || !draft}
+                    className="inline-flex items-center justify-center gap-2 bg-ink text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-50"
+                >
+                    <Plus size={16} />
+                    Ajouter ce jour
+                </button>
+            </div>
         </div>
     );
 }
