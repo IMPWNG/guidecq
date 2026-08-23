@@ -64,7 +64,7 @@ type StatusType =
     | 'annule';
 
 type TourPhase = 'upcoming' | 'ongoing' | 'finished' | 'cancelled';
-type FilterType = 'tous' | 'a_venir' | 'en_visite' | 'termines' | 'annules';
+type FilterType = 'tous' | 'a_confirmer' | 'a_venir' | 'en_visite' | 'termines' | 'annules';
 
 const STATUS_CONFIG: Record<
     StatusType,
@@ -340,6 +340,35 @@ function getTourPhase(request: TourRequest): TourPhase {
     return 'ongoing';
 }
 
+function hasPreciseVisitDate(request: TourRequest) {
+    return getVisitDays(request).length > 0;
+}
+
+function isAwaitingConfirmation(request: TourRequest, phase: TourPhase) {
+    if (
+        request.status === 'confirme' ||
+        request.status === 'termine' ||
+        request.status === 'annule' ||
+        phase === 'cancelled' ||
+        phase === 'finished'
+    ) {
+        return false;
+    }
+    if (request.status === 'email_envoye') {
+        return phase !== 'ongoing' || !hasPreciseVisitDate(request);
+    }
+    return !hasPreciseVisitDate(request);
+}
+
+function isConfirmedUpcoming(request: TourRequest, phase: TourPhase) {
+    return request.status === 'confirme' && phase === 'upcoming';
+}
+
+function isOnVisitNow(request: TourRequest, phase: TourPhase) {
+    if (phase !== 'ongoing' || request.status === 'annule') return false;
+    return request.status === 'confirme' || hasPreciseVisitDate(request);
+}
+
 const PHASE_LABEL: Record<TourPhase, { label: string; className: string }> = {
     upcoming: { label: 'À venir', className: 'bg-blue-100 text-blue-900' },
     ongoing: { label: 'En visite', className: 'bg-emerald-100 text-emerald-900' },
@@ -478,10 +507,19 @@ export default function AdminChongqing() {
 
     const stats = useMemo(() => {
         const active = enriched.filter((item) => item.phase !== 'cancelled');
-        const upcoming = active.filter((item) => item.phase === 'upcoming');
-        const ongoing = active.filter((item) => item.phase === 'ongoing');
+        const toConfirm = active.filter((item) =>
+            isAwaitingConfirmation(item.request, item.phase)
+        );
+        const upcoming = active.filter((item) =>
+            isConfirmedUpcoming(item.request, item.phase)
+        );
+        const ongoing = active.filter((item) =>
+            isOnVisitNow(item.request, item.phase)
+        );
         const finished = active.filter((item) => item.phase === 'finished');
-        const remainingTours = [...upcoming, ...ongoing];
+        const remainingTours = active.filter(
+            (item) => item.phase === 'upcoming' || item.phase === 'ongoing'
+        );
 
         const sumPeople = (items: typeof active) =>
             items.reduce((acc, item) => acc + item.headcount.count, 0);
@@ -497,6 +535,8 @@ export default function AdminChongqing() {
 
         return {
             reservations: active.length,
+            peopleToConfirm: sumPeople(toConfirm),
+            toursToConfirm: toConfirm.length,
             peopleUpcoming: sumPeople(upcoming),
             toursUpcoming: upcoming.length,
             peopleOngoing: sumPeople(ongoing),
@@ -513,8 +553,15 @@ export default function AdminChongqing() {
 
     const filtered = useMemo(() => {
         const list = enriched.filter((item) => {
-            if (filter === 'a_venir') return item.phase === 'upcoming';
-            if (filter === 'en_visite') return item.phase === 'ongoing';
+            if (filter === 'a_confirmer') {
+                return isAwaitingConfirmation(item.request, item.phase);
+            }
+            if (filter === 'a_venir') {
+                return isConfirmedUpcoming(item.request, item.phase);
+            }
+            if (filter === 'en_visite') {
+                return isOnVisitNow(item.request, item.phase);
+            }
             if (filter === 'termines') return item.phase === 'finished';
             if (filter === 'annules') return item.phase === 'cancelled';
             return true;
@@ -643,6 +690,7 @@ export default function AdminChongqing() {
 
     const filters: { id: FilterType; label: string; count: number }[] = [
         { id: 'tous', label: 'Tous', count: enriched.length },
+        { id: 'a_confirmer', label: 'À confirmer', count: stats.toursToConfirm },
         { id: 'a_venir', label: 'À venir', count: stats.toursUpcoming },
         { id: 'en_visite', label: 'En visite', count: stats.toursOngoing },
         { id: 'termines', label: 'Tours finis', count: stats.toursFinished },
@@ -673,11 +721,17 @@ export default function AdminChongqing() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+                    <StatCard
+                        label="À confirmer"
+                        value={stats.peopleToConfirm}
+                        hint={`${stats.toursToConfirm} dossier${stats.toursToConfirm > 1 ? 's' : ''} sans confirmation`}
+                        tone="amber"
+                    />
                     <StatCard
                         label="Personnes à venir"
                         value={stats.peopleUpcoming}
-                        hint={`${stats.toursUpcoming} tour${stats.toursUpcoming > 1 ? 's' : ''}`}
+                        hint={`${stats.toursUpcoming} tour${stats.toursUpcoming > 1 ? 's' : ''} confirmé${stats.toursUpcoming > 1 ? 's' : ''}`}
                         tone="sky"
                     />
                     <StatCard
