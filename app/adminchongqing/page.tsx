@@ -6,6 +6,8 @@ import {
     CalendarDays,
     CheckCircle2,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     Download,
     Mail,
     Phone,
@@ -781,10 +783,23 @@ export default function AdminChongqing() {
                         tone="amber"
                     />
                 </div>
-                <p className="text-sm font-medium text-ink/70 mb-8">
+                <p className="text-sm font-medium text-ink/70 mb-6">
                     La projection et le reste à encaisser ne comptent que les tours confirmés
                     et finis. Les non confirmés apparaissent seulement en hypothétique.
                 </p>
+
+                <VisitCalendar
+                    items={enriched}
+                    onSelectRequest={(id) => {
+                        setFilter('tous');
+                        setExpandedId(id);
+                        window.setTimeout(() => {
+                            document
+                                .getElementById(`reservation-${id}`)
+                                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        }, 80);
+                    }}
+                />
 
                 <div className="mb-6 flex gap-3 flex-wrap">
                     <button
@@ -841,6 +856,7 @@ export default function AdminChongqing() {
 
                             return (
                                 <div
+                                    id={`reservation-${request.id}`}
                                     key={request.id}
                                     className={`rounded-2xl bg-white shadow-md border-l-8 overflow-hidden ${statusConfig.border}`}
                                 >
@@ -1237,6 +1253,227 @@ export default function AdminChongqing() {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+const WEEKDAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+
+function padDatePart(value: number) {
+    return String(value).padStart(2, '0');
+}
+
+function visitChipClass(status: StatusType) {
+    if (status === 'termine') return 'bg-slate-200 text-slate-800';
+    if (status === 'confirme') return 'bg-emerald-200 text-emerald-900';
+    return 'bg-amber-200 text-amber-900';
+}
+
+function VisitCalendar({
+    items,
+    onSelectRequest,
+}: {
+    items: { request: TourRequest; headcount: { count: number } }[];
+    onSelectRequest: (id: string) => void;
+}) {
+    const today = startOfDay(new Date());
+    const [cursor, setCursor] = useState(
+        () => new Date(today.getFullYear(), today.getMonth(), 1)
+    );
+    const [selectedDay, setSelectedDay] = useState<string | null>(null);
+
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+
+    const visitsByDay = useMemo(() => {
+        const map = new Map<
+            string,
+            { id: string; name: string; people: number; status: StatusType }[]
+        >();
+
+        for (const item of items) {
+            if (item.request.status === 'annule') continue;
+            for (const day of getVisitDays(item.request)) {
+                const list = map.get(day) ?? [];
+                list.push({
+                    id: item.request.id,
+                    name: `${item.request.prenom} ${item.request.nom}`.trim(),
+                    people: item.headcount.count,
+                    status: item.request.status,
+                });
+                map.set(day, list);
+            }
+        }
+
+        return map;
+    }, [items]);
+
+    const monthPrefix = `${year}-${padDatePart(month + 1)}`;
+    const monthVisitDays = [...visitsByDay.keys()].filter((day) =>
+        day.startsWith(monthPrefix)
+    ).length;
+
+    const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells: Array<number | null> = [
+        ...Array.from({ length: firstWeekday }, () => null),
+        ...Array.from({ length: daysInMonth }, (_, index) => index + 1),
+    ];
+    while (cells.length % 7 !== 0) cells.push(null);
+
+    const monthLabel = cursor.toLocaleDateString('fr-FR', {
+        month: 'long',
+        year: 'numeric',
+    });
+    const selectedVisits = selectedDay ? visitsByDay.get(selectedDay) ?? [] : [];
+
+    return (
+        <div className="bg-white border-2 border-ink/10 rounded-2xl p-4 sm:p-5 shadow-sm mb-8">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <div>
+                    <h2 className="text-lg sm:text-xl font-extrabold text-ink">
+                        Calendrier des visites
+                    </h2>
+                    <p className="text-sm font-medium text-ink/70">
+                        Seulement les jours de visite — {monthVisitDays} jour
+                        {monthVisitDays > 1 ? 's' : ''} ce mois-ci
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setCursor(new Date(year, month - 1, 1))
+                        }
+                        className="p-2 rounded-xl border-2 border-ink/10 hover:bg-ink/5"
+                        aria-label="Mois précédent"
+                    >
+                        <ChevronLeft size={20} />
+                    </button>
+                    <p className="font-bold text-ink min-w-40 text-center capitalize">
+                        {monthLabel}
+                    </p>
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setCursor(new Date(year, month + 1, 1))
+                        }
+                        className="p-2 rounded-xl border-2 border-ink/10 hover:bg-ink/5"
+                        aria-label="Mois suivant"
+                    >
+                        <ChevronRight size={20} />
+                    </button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                {WEEKDAYS.map((day) => (
+                    <div
+                        key={day}
+                        className="text-center text-xs sm:text-sm font-bold text-ink/50 py-1"
+                    >
+                        {day}
+                    </div>
+                ))}
+                {cells.map((day, index) => {
+                    if (!day) {
+                        return <div key={`empty-${index}`} className="min-h-12 sm:min-h-18" />;
+                    }
+
+                    const iso = `${year}-${padDatePart(month + 1)}-${padDatePart(day)}`;
+                    const visits = visitsByDay.get(iso) ?? [];
+                    const isToday =
+                        today.getFullYear() === year &&
+                        today.getMonth() === month &&
+                        today.getDate() === day;
+                    const isSelected = selectedDay === iso;
+                    const hasVisits = visits.length > 0;
+
+                    return (
+                        <button
+                            key={iso}
+                            type="button"
+                            onClick={() => setSelectedDay(iso)}
+                            className={`min-h-12 sm:min-h-18 rounded-xl border-2 p-1 sm:p-1.5 text-left transition-all ${
+                                isSelected
+                                    ? 'border-ink bg-sunshine/30'
+                                    : hasVisits
+                                      ? 'border-apricot/50 bg-apricot/10 hover:bg-apricot/20'
+                                      : 'border-transparent hover:bg-ink/5'
+                            } ${isToday ? 'ring-2 ring-apricot' : ''}`}
+                        >
+                            <span
+                                className={`text-sm font-extrabold ${
+                                    hasVisits ? 'text-ink' : 'text-ink/50'
+                                }`}
+                            >
+                                {day}
+                            </span>
+                            {hasVisits && (
+                                <>
+                                    <p className="text-[10px] sm:text-xs font-bold text-ink/80">
+                                        {visits.length} vis.
+                                    </p>
+                                    <div className="hidden sm:flex flex-col gap-0.5 mt-1">
+                                        {visits.slice(0, 2).map((visit) => (
+                                            <span
+                                                key={`${iso}-${visit.id}`}
+                                                className={`truncate rounded px-1 py-0.5 text-[10px] font-bold ${visitChipClass(visit.status)}`}
+                                            >
+                                                {visit.name.split(' ')[0]}
+                                            </span>
+                                        ))}
+                                        {visits.length > 2 && (
+                                            <span className="text-[10px] font-bold text-ink/60">
+                                                +{visits.length - 2}
+                                            </span>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </button>
+                    );
+                })}
+            </div>
+
+            <div className="flex flex-wrap gap-3 mt-3 text-xs font-semibold text-ink/70">
+                <span className="inline-flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Confirmé
+                </span>
+                <span className="inline-flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> À confirmer
+                </span>
+                <span className="inline-flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Fini
+                </span>
+            </div>
+
+            {selectedDay && (
+                <div className="mt-4 border-t-2 border-ink/10 pt-3">
+                    <p className="font-bold text-ink mb-2">
+                        {formatLongDate(selectedDay)}
+                    </p>
+                    {selectedVisits.length === 0 ? (
+                        <p className="text-sm font-medium text-ink/60">
+                            Aucune visite ce jour-là
+                        </p>
+                    ) : (
+                        <div className="flex flex-col gap-2">
+                            {selectedVisits.map((visit) => (
+                                <button
+                                    key={`${selectedDay}-${visit.id}`}
+                                    type="button"
+                                    onClick={() => onSelectRequest(visit.id)}
+                                    className={`text-left px-3 py-2 rounded-xl font-semibold ${visitChipClass(visit.status)}`}
+                                >
+                                    {visit.name} · {visit.people} pers. ·{' '}
+                                    {getStatusConfig(visit.status).label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
