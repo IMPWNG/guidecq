@@ -220,8 +220,8 @@ function getPaymentState(
 
     return {
         collected: 0,
-        outstanding: pricing.total,
-        note: 'Pas encore confirmé — rien reçu',
+        outstanding: 0,
+        note: 'Pas encore confirmé — hors encaissement',
     };
 }
 
@@ -516,9 +516,20 @@ export default function AdminChongqing() {
         const ongoing = active.filter((item) =>
             isOnVisitNow(item.request, item.phase)
         );
-        const finished = active.filter((item) => item.phase === 'finished');
-        const remainingTours = active.filter(
-            (item) => item.phase === 'upcoming' || item.phase === 'ongoing'
+        const finishedPeople = active.filter((item) => item.phase === 'finished');
+        const finishedPaid = active.filter(
+            (item) =>
+                item.request.status === 'termine' ||
+                (item.request.status === 'confirme' && item.phase === 'finished')
+        );
+        const confirmedToDo = active.filter(
+            (item) => item.request.status === 'confirme' && item.phase !== 'finished'
+        );
+        const hypothetical = active.filter(
+            (item) =>
+                item.request.status !== 'confirme' &&
+                item.request.status !== 'termine' &&
+                item.request.status !== 'annule'
         );
 
         const sumPeople = (items: typeof active) =>
@@ -530,8 +541,9 @@ export default function AdminChongqing() {
         const sumOutstanding = (items: typeof active) =>
             items.reduce((acc, item) => acc + item.payment.outstanding, 0);
 
-        const projectionFinished = sumTotal(finished);
-        const projectionRemaining = sumTotal(remainingTours);
+        const projectionFinished = sumTotal(finishedPaid);
+        const projectionToDo = sumTotal(confirmedToDo);
+        const projectionHypothetical = sumTotal(hypothetical);
 
         return {
             reservations: active.length,
@@ -541,13 +553,14 @@ export default function AdminChongqing() {
             toursUpcoming: upcoming.length,
             peopleOngoing: sumPeople(ongoing),
             toursOngoing: ongoing.length,
-            peopleFinished: sumPeople(finished),
-            toursFinished: finished.length,
-            projection: projectionFinished + projectionRemaining,
+            peopleFinished: sumPeople(finishedPeople),
+            toursFinished: finishedPeople.length,
+            projection: projectionFinished + projectionToDo,
             projectionFinished,
-            projectionRemaining,
+            projectionToDo,
+            projectionHypothetical,
             collected: sumCollected(active),
-            outstanding: sumOutstanding(active),
+            outstanding: sumOutstanding(confirmedToDo),
         };
     }, [enriched]);
 
@@ -752,7 +765,7 @@ export default function AdminChongqing() {
                     <StatCard
                         label="Projection totale"
                         value={formatEuro(stats.projection)}
-                        hint={`${formatEuro(stats.projectionFinished)} finis + ${formatEuro(stats.projectionRemaining)} à faire`}
+                        hint={`${formatEuro(stats.projectionFinished)} finis + ${formatEuro(stats.projectionToDo)} à faire (${formatEuro(stats.projectionHypothetical)} hypothétiques à venir)`}
                         tone="orange"
                     />
                     <StatCard
@@ -764,13 +777,13 @@ export default function AdminChongqing() {
                     <StatCard
                         label="Reste à encaisser"
                         value={formatEuro(stats.outstanding)}
-                        hint="Solde des confirmés + total des non confirmés"
+                        hint="Solde 75 % des tours confirmés pas encore faits"
                         tone="amber"
                     />
                 </div>
                 <p className="text-sm font-medium text-ink/70 mb-8">
-                    Confirmé (tour pas encore fait) = seul l&apos;acompte est reçu. Tour fini =
-                    tout est encaissé. Autre statut = rien reçu pour l&apos;instant.
+                    La projection et le reste à encaisser ne comptent que les tours confirmés
+                    et finis. Les non confirmés apparaissent seulement en hypothétique.
                 </p>
 
                 <div className="mb-6 flex gap-3 flex-wrap">
@@ -1253,7 +1266,7 @@ function StatCard({
                 {label}
             </p>
             <p className="text-3xl sm:text-4xl font-extrabold leading-tight">{value}</p>
-            <p className="text-sm font-medium text-ink/70 mt-1">{hint}</p>
+            <p className="text-sm font-medium text-ink/70 mt-1 leading-snug">{hint}</p>
         </div>
     );
 }
