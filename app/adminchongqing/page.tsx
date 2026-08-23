@@ -189,6 +189,42 @@ function getPricing(peopleCount: number) {
     return { total, deposit, remaining };
 }
 
+function getPaymentState(
+    request: TourRequest,
+    pricing: { total: number; deposit: number; remaining: number },
+    phase: TourPhase
+) {
+    if (request.status === 'annule' || phase === 'cancelled') {
+        return {
+            collected: 0,
+            outstanding: 0,
+            note: 'Annulé — hors projection',
+        };
+    }
+
+    if (request.status === 'termine' || (request.status === 'confirme' && phase === 'finished')) {
+        return {
+            collected: pricing.total,
+            outstanding: 0,
+            note: 'Tour fini — total encaissé',
+        };
+    }
+
+    if (request.status === 'confirme') {
+        return {
+            collected: pricing.deposit,
+            outstanding: pricing.remaining,
+            note: 'Confirmé — acompte 25 % reçu, solde à percevoir',
+        };
+    }
+
+    return {
+        collected: 0,
+        outstanding: pricing.total,
+        note: 'Pas encore confirmé — rien reçu',
+    };
+}
+
 function formatEuro(amount: number) {
     return new Intl.NumberFormat('fr-FR', {
         style: 'currency',
@@ -368,7 +404,7 @@ export default function AdminChongqing() {
             if (updateError) {
                 const extra =
                     newStatus === 'termine'
-                        ? '\n\nSi Supabase refuse cette valeur, ajoute « termine » aux statuts autorisés de la colonne status.'
+                        ? '\n\nColle ceci dans Supabase → SQL Editor, puis réessaie :\n\nALTER TABLE tour_requests DROP CONSTRAINT IF EXISTS tour_requests_status_check;\nALTER TABLE tour_requests ADD CONSTRAINT tour_requests_status_check CHECK (status IN (\'nouveau\', \'en_cours\', \'email_envoye\', \'confirme\', \'termine\', \'annule\'));'
                         : '';
                 alert('Erreur: ' + updateError.message + extra);
                 return;
@@ -435,7 +471,8 @@ export default function AdminChongqing() {
             const headcount = getHeadcount(request);
             const pricing = getPricing(headcount.count);
             const phase = getTourPhase(request);
-            return { request, headcount, pricing, phase };
+            const payment = getPaymentState(request, pricing, phase);
+            return { request, headcount, pricing, phase, payment };
         });
     }, [requests]);
 
@@ -444,13 +481,19 @@ export default function AdminChongqing() {
         const upcoming = active.filter((item) => item.phase === 'upcoming');
         const ongoing = active.filter((item) => item.phase === 'ongoing');
         const finished = active.filter((item) => item.phase === 'finished');
+        const remainingTours = [...upcoming, ...ongoing];
 
         const sumPeople = (items: typeof active) =>
             items.reduce((acc, item) => acc + item.headcount.count, 0);
         const sumTotal = (items: typeof active) =>
             items.reduce((acc, item) => acc + item.pricing.total, 0);
-        const sumDeposit = (items: typeof active) =>
-            items.reduce((acc, item) => acc + item.pricing.deposit, 0);
+        const sumCollected = (items: typeof active) =>
+            items.reduce((acc, item) => acc + item.payment.collected, 0);
+        const sumOutstanding = (items: typeof active) =>
+            items.reduce((acc, item) => acc + item.payment.outstanding, 0);
+
+        const projectionFinished = sumTotal(finished);
+        const projectionRemaining = sumTotal(remainingTours);
 
         return {
             reservations: active.length,
@@ -460,9 +503,11 @@ export default function AdminChongqing() {
             toursOngoing: ongoing.length,
             peopleFinished: sumPeople(finished),
             toursFinished: finished.length,
-            total: sumTotal(active),
-            deposit: sumDeposit(active),
-            remaining: sumTotal(active) - sumDeposit(active),
+            projection: projectionFinished + projectionRemaining,
+            projectionFinished,
+            projectionRemaining,
+            collected: sumCollected(active),
+            outstanding: sumOutstanding(active),
         };
     }, [enriched]);
 
@@ -521,12 +566,13 @@ export default function AdminChongqing() {
             'Inscrit dans la liste',
             'Nb Personnes (tarif)',
             'Total €',
-            'Acompte 25% €',
-            'Solde €',
+            'Déjà encaissé €',
+            'Reste à encaisser €',
+            'Note paiement',
             'Date Soumission',
         ];
 
-        const rows = enriched.map(({ request, headcount, pricing, phase }) => [
+        const rows = enriched.map(({ request, headcount, pricing, phase, payment }) => [
             request.id,
             request.prenom,
             request.nom,
@@ -556,8 +602,9 @@ export default function AdminChongqing() {
             headcount.registrantInList ? 'Oui' : 'Non',
             headcount.count,
             pricing.total,
-            pricing.deposit,
-            pricing.remaining,
+            payment.collected,
+            payment.outstanding,
+            payment.note,
             new Date(request.created_at).toLocaleDateString('fr-FR'),
         ]);
 
@@ -626,7 +673,7 @@ export default function AdminChongqing() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
                     <StatCard
                         label="Personnes à venir"
                         value={stats.peopleUpcoming}
@@ -645,38 +692,32 @@ export default function AdminChongqing() {
                         hint={`${stats.toursFinished} tour${stats.toursFinished > 1 ? 's' : ''} fini${stats.toursFinished > 1 ? 's' : ''}`}
                         tone="slate"
                     />
-                    <StatCard
-                        label="Total à encaisser"
-                        value={formatEuro(stats.total)}
-                        hint="Hors annulations"
-                        tone="orange"
-                    />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-8">
-                    <div className="bg-white border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
-                        <p className="text-sm font-semibold uppercase tracking-wide text-amber-800 mb-1">
-                            Acomptes 25 %
-                        </p>
-                        <p className="text-3xl sm:text-4xl font-extrabold text-amber-900">
-                            {formatEuro(stats.deposit)}
-                        </p>
-                        <p className="text-sm text-ink/70 mt-1">
-                            Montant d&apos;acompte attendu sur les tours actifs
-                        </p>
-                    </div>
-                    <div className="bg-white border-2 border-emerald-300 rounded-2xl p-5 shadow-sm">
-                        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-800 mb-1">
-                            Soldes restants 75 %
-                        </p>
-                        <p className="text-3xl sm:text-4xl font-extrabold text-emerald-900">
-                            {formatEuro(stats.remaining)}
-                        </p>
-                        <p className="text-sm text-ink/70 mt-1">
-                            Reste à encaisser après les acomptes
-                        </p>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-3">
+                    <StatCard
+                        label="Projection totale"
+                        value={formatEuro(stats.projection)}
+                        hint={`${formatEuro(stats.projectionFinished)} finis + ${formatEuro(stats.projectionRemaining)} à faire`}
+                        tone="orange"
+                    />
+                    <StatCard
+                        label="Déjà encaissé"
+                        value={formatEuro(stats.collected)}
+                        hint="Tours finis = 100 % · Confirmés = acompte 25 %"
+                        tone="green"
+                    />
+                    <StatCard
+                        label="Reste à encaisser"
+                        value={formatEuro(stats.outstanding)}
+                        hint="Solde des confirmés + total des non confirmés"
+                        tone="amber"
+                    />
                 </div>
+                <p className="text-sm font-medium text-ink/70 mb-8">
+                    Confirmé (tour pas encore fait) = seul l&apos;acompte est reçu. Tour fini =
+                    tout est encaissé. Autre statut = rien reçu pour l&apos;instant.
+                </p>
 
                 <div className="mb-6 flex gap-3 flex-wrap">
                     <button
@@ -719,7 +760,7 @@ export default function AdminChongqing() {
                     </div>
                 ) : (
                     <div className="space-y-5">
-                        {filtered.map(({ request, headcount, pricing, phase }) => {
+                        {filtered.map(({ request, headcount, pricing, phase, payment }) => {
                             const statusConfig = getStatusConfig(request.status);
                             const duration = stayDuration(
                                 request.date_arrivee,
@@ -815,13 +856,24 @@ export default function AdminChongqing() {
                                                     label="Total"
                                                     value={formatEuro(pricing.total)}
                                                     extra={`${UNIT_PRICE} € × ${headcount.count}`}
-                                                    emphasize
                                                 />
                                                 <InfoChip
                                                     icon={<CheckCircle2 size={18} />}
-                                                    label="Acompte / solde"
-                                                    value={formatEuro(pricing.deposit)}
-                                                    extra={`Reste ${formatEuro(pricing.remaining)}`}
+                                                    label="Déjà encaissé"
+                                                    value={formatEuro(payment.collected)}
+                                                    extra={payment.note}
+                                                    emphasize={payment.collected > 0}
+                                                />
+                                                <InfoChip
+                                                    icon={<Wallet size={18} />}
+                                                    label="Reste à encaisser"
+                                                    value={formatEuro(payment.outstanding)}
+                                                    extra={
+                                                        payment.outstanding > 0
+                                                            ? 'Encore à percevoir'
+                                                            : 'Rien à percevoir'
+                                                    }
+                                                    warn={payment.outstanding > 0}
                                                 />
                                             </div>
 
@@ -910,7 +962,7 @@ export default function AdminChongqing() {
 
                                             <div className="bg-white p-4 rounded-xl border-2 border-emerald-200">
                                                 <h4 className="font-bold text-ink text-lg mb-3">
-                                                    Tarif automatique
+                                                    Tarif & encaissement
                                                 </h4>
                                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                                     <PriceBox
@@ -918,22 +970,29 @@ export default function AdminChongqing() {
                                                         value={`${headcount.count}`}
                                                     />
                                                     <PriceBox
-                                                        label="Prix unitaire"
-                                                        value={formatEuro(UNIT_PRICE)}
-                                                    />
-                                                    <PriceBox
                                                         label="Total"
                                                         value={formatEuro(pricing.total)}
                                                         highlight
                                                     />
                                                     <PriceBox
-                                                        label="Acompte 25 %"
-                                                        value={formatEuro(pricing.deposit)}
+                                                        label="Déjà encaissé"
+                                                        value={formatEuro(payment.collected)}
+                                                    />
+                                                    <PriceBox
+                                                        label="Reste à encaisser"
+                                                        value={formatEuro(payment.outstanding)}
                                                     />
                                                 </div>
                                                 <p className="mt-3 text-base font-semibold text-ink">
-                                                    Solde restant : {formatEuro(pricing.remaining)}
+                                                    {payment.note}
                                                 </p>
+                                                {request.status === 'confirme' &&
+                                                    phase !== 'finished' && (
+                                                        <p className="mt-2 text-sm font-medium text-ink/70">
+                                                            Acompte 25 % : {formatEuro(pricing.deposit)} ·
+                                                            Solde 75 % : {formatEuro(pricing.remaining)}
+                                                        </p>
+                                                    )}
                                                 {headcount.registrantAdded && (
                                                     <p className="mt-2 text-sm font-medium text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                                                         L&apos;inscrit ({request.prenom} {request.nom}) n&apos;est
@@ -1124,13 +1183,14 @@ function StatCard({
     label: string;
     value: string | number;
     hint: string;
-    tone: 'sky' | 'green' | 'slate' | 'orange';
+    tone: 'sky' | 'green' | 'slate' | 'orange' | 'amber';
 }) {
     const tones = {
         sky: 'border-blue-400 text-blue-900',
         green: 'border-bamboo text-green-900',
         slate: 'border-slate-400 text-slate-900',
         orange: 'border-apricot text-orange-900',
+        amber: 'border-amber-400 text-amber-900',
     };
 
     return (
