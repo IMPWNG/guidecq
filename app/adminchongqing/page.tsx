@@ -1,13 +1,26 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ChevronDown, Download, Trash2, CheckCircle, Mail, Clock, X } from 'lucide-react';
+import {
+    CalendarDays,
+    CheckCircle2,
+    ChevronDown,
+    Download,
+    Mail,
+    Phone,
+    Trash2,
+    Users,
+    Wallet,
+} from 'lucide-react';
+
+const UNIT_PRICE = 85;
+const DEPOSIT_RATE = 0.25;
 
 interface Participant {
     prenom: string;
     nom?: string;
-    age: number;
+    age: number | string;
 }
 
 interface TourRequest {
@@ -32,21 +45,218 @@ interface TourRequest {
     transport_prefere: string;
     rythme: string;
     commentaires: string;
-    participants: Participant[];
+    participants: Participant[] | string | null;
     langues: string[];
     option_voiture_privee: boolean;
-    status: 'nouveau' | 'en_cours' | 'email_envoye' | 'confirme' | 'annule';
+    status: StatusType;
     created_at: string;
 }
 
-type StatusType = 'nouveau' | 'en_cours' | 'email_envoye' | 'confirme' | 'annule';
+type StatusType =
+    | 'nouveau'
+    | 'en_cours'
+    | 'email_envoye'
+    | 'confirme'
+    | 'termine'
+    | 'annule';
 
-const STATUS_CONFIG: Record<StatusType, { label: string; color: string; bgColor: string; icon: string }> = {
-    nouveau: { label: '🆕 Nouveau', color: 'text-blue-700', bgColor: 'bg-blue-100', icon: '📝' },
-    en_cours: { label: '⏳ En cours', color: 'text-yellow-700', bgColor: 'bg-yellow-100', icon: '⏰' },
-    email_envoye: { label: '📧 Email envoyé', color: 'text-purple-700', bgColor: 'bg-purple-100', icon: '✉️' },
-    confirme: { label: '✅ Confirmé', color: 'text-green-700', bgColor: 'bg-green-100', icon: '✔️' },
-    annule: { label: '❌ Annulé', color: 'text-red-700', bgColor: 'bg-red-100', icon: '✗' },
+type TourPhase = 'upcoming' | 'ongoing' | 'finished' | 'cancelled';
+type FilterType = 'tous' | 'a_venir' | 'en_visite' | 'termines' | 'annules';
+
+const STATUS_CONFIG: Record<
+    StatusType,
+    { label: string; color: string; bgColor: string; border: string }
+> = {
+    nouveau: {
+        label: 'Nouveau',
+        color: 'text-blue-800',
+        bgColor: 'bg-blue-100',
+        border: 'border-blue-500',
+    },
+    en_cours: {
+        label: 'En cours',
+        color: 'text-amber-800',
+        bgColor: 'bg-amber-100',
+        border: 'border-amber-500',
+    },
+    email_envoye: {
+        label: 'Email envoyé',
+        color: 'text-purple-800',
+        bgColor: 'bg-purple-100',
+        border: 'border-purple-500',
+    },
+    confirme: {
+        label: 'Confirmé',
+        color: 'text-green-800',
+        bgColor: 'bg-green-100',
+        border: 'border-green-500',
+    },
+    termine: {
+        label: 'Tour fini',
+        color: 'text-slate-800',
+        bgColor: 'bg-slate-200',
+        border: 'border-slate-600',
+    },
+    annule: {
+        label: 'Annulé',
+        color: 'text-red-800',
+        bgColor: 'bg-red-100',
+        border: 'border-red-500',
+    },
+};
+
+function normalizeName(value: string | undefined | null): string {
+    return (value || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .replace(/\s+/g, ' ');
+}
+
+function getParticipants(request: TourRequest): Participant[] {
+    const raw = request.participants;
+    if (!raw) return [];
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+    return Array.isArray(raw) ? raw : [];
+}
+
+function isSamePerson(
+    firstName: string,
+    lastName: string,
+    participant: Participant
+): boolean {
+    const first = normalizeName(firstName);
+    const last = normalizeName(lastName);
+    const full = `${first} ${last}`.trim();
+    const pFirst = normalizeName(participant.prenom);
+    const pLast = normalizeName(participant.nom);
+    const pFull = `${pFirst} ${pLast}`.trim();
+
+    if (!pFirst) return false;
+    if (pFull === full) return true;
+    if (pFirst === full || pFull === first) return true;
+    if (pFirst === first && (!pLast || !last || pLast === last)) return true;
+    return false;
+}
+
+function getHeadcount(request: TourRequest) {
+    const listed = getParticipants(request);
+    const registrantInList = listed.some((p) =>
+        isSamePerson(request.prenom, request.nom, p)
+    );
+
+    if (listed.length === 0) {
+        return {
+            count: 1,
+            listed: 0,
+            registrantInList: false,
+            registrantAdded: true,
+        };
+    }
+
+    if (registrantInList) {
+        return {
+            count: listed.length,
+            listed: listed.length,
+            registrantInList: true,
+            registrantAdded: false,
+        };
+    }
+
+    return {
+        count: listed.length + 1,
+        listed: listed.length,
+        registrantInList: false,
+        registrantAdded: true,
+    };
+}
+
+function getPricing(peopleCount: number) {
+    const total = peopleCount * UNIT_PRICE;
+    const deposit = Math.round(total * DEPOSIT_RATE * 100) / 100;
+    const remaining = Math.round((total - deposit) * 100) / 100;
+    return { total, deposit, remaining };
+}
+
+function formatEuro(amount: number) {
+    return new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: 'EUR',
+        minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+}
+
+function parseLocalDate(value: string | null | undefined): Date | null {
+    if (!value) return null;
+    const [year, month, day] = value.split('T')[0].split('-').map(Number);
+    if (!year || !month || !day) return null;
+    return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function startOfDay(date: Date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function formatLongDate(value: string) {
+    const date = parseLocalDate(value);
+    if (!date) return '—';
+    return date.toLocaleDateString('fr-FR', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
+function stayDuration(arrivee: string, depart: string) {
+    const start = parseLocalDate(arrivee);
+    const end = parseLocalDate(depart);
+    if (!start || !end) return null;
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    return days > 0 ? days : 1;
+}
+
+function getStatusConfig(status: string | undefined) {
+    if (status && status in STATUS_CONFIG) {
+        return STATUS_CONFIG[status as StatusType];
+    }
+    return STATUS_CONFIG.nouveau;
+}
+
+function getTourPhase(request: TourRequest): TourPhase {
+    if (request.status === 'annule') return 'cancelled';
+    if (request.status === 'termine') return 'finished';
+
+    const today = startOfDay(new Date());
+    const arrivee = parseLocalDate(request.date_arrivee);
+    const depart = parseLocalDate(request.date_depart);
+
+    if (depart && startOfDay(depart) < today) return 'finished';
+    if (arrivee && startOfDay(arrivee) > today) return 'upcoming';
+    return 'ongoing';
+}
+
+const PHASE_LABEL: Record<TourPhase, { label: string; className: string }> = {
+    upcoming: { label: 'À venir', className: 'bg-blue-100 text-blue-900' },
+    ongoing: { label: 'En visite', className: 'bg-emerald-100 text-emerald-900' },
+    finished: { label: 'Tour fini', className: 'bg-slate-200 text-slate-800' },
+    cancelled: { label: 'Annulé', className: 'bg-red-100 text-red-800' },
+};
+
+const PHASE_ORDER: Record<TourPhase, number> = {
+    ongoing: 0,
+    upcoming: 1,
+    finished: 2,
+    cancelled: 3,
 };
 
 export default function AdminChongqing() {
@@ -55,31 +265,29 @@ export default function AdminChongqing() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [updatingId, setUpdatingId] = useState<string | null>(null);
+    const [filter, setFilter] = useState<FilterType>('tous');
+
+    const loadRequests = async () => {
+        const { data, error: fetchError } = await supabase
+            .from('tour_requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (fetchError) {
+            setError(`Erreur: ${fetchError.message}`);
+            setRequests([]);
+            return;
+        }
+
+        setRequests(data || []);
+        setError(null);
+    };
 
     useEffect(() => {
         const fetchRequests = async () => {
             try {
-                console.log('🔄 Tentative de connexion à Supabase...');
-                console.log('URL:', process.env.NEXT_PUBLIC_SUPABASE_URL);
-
-                const { data, error } = await supabase
-                    .from('tour_requests')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
-                console.log('📊 Réponse Supabase:', { data, error });
-
-                if (error) {
-                    console.error('❌ Erreur Supabase:', error);
-                    setError(`Erreur: ${error.message}`);
-                    setRequests([]);
-                } else {
-                    console.log('✅ Données reçues:', data);
-                    setRequests(data || []);
-                    setError(null);
-                }
+                await loadRequests();
             } catch (err) {
-                console.error('❌ Erreur:', err);
                 setError(`Erreur: ${String(err)}`);
                 setRequests([]);
             } finally {
@@ -90,24 +298,25 @@ export default function AdminChongqing() {
         fetchRequests();
     }, []);
 
-    // 🔄 Mettre à jour le status
     const updateStatus = async (id: string, newStatus: StatusType) => {
         setUpdatingId(id);
         try {
-            const { error } = await supabase
+            const { error: updateError } = await supabase
                 .from('tour_requests')
                 .update({ status: newStatus })
                 .eq('id', id);
 
-            if (error) {
-                alert('Erreur: ' + error.message);
+            if (updateError) {
+                const extra =
+                    newStatus === 'termine'
+                        ? '\n\nSi Supabase refuse cette valeur, ajoute « termine » aux statuts autorisés de la colonne status.'
+                        : '';
+                alert('Erreur: ' + updateError.message + extra);
                 return;
             }
 
-            setRequests(
-                requests.map((r) =>
-                    r.id === id ? { ...r, status: newStatus } : r
-                )
+            setRequests((prev) =>
+                prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
             );
         } catch (err) {
             console.error('Erreur:', err);
@@ -120,21 +329,75 @@ export default function AdminChongqing() {
     const deleteRequest = async (id: string) => {
         if (!confirm('Sûr de vouloir supprimer ?')) return;
 
-        const { error } = await supabase
+        const { error: deleteError } = await supabase
             .from('tour_requests')
             .delete()
             .eq('id', id);
 
-        if (error) {
-            alert('Erreur: ' + error.message);
+        if (deleteError) {
+            alert('Erreur: ' + deleteError.message);
             return;
         }
 
-        setRequests(requests.filter((r) => r.id !== id));
+        setRequests((prev) => prev.filter((r) => r.id !== id));
     };
 
+    const enriched = useMemo(() => {
+        return requests.map((request) => {
+            const headcount = getHeadcount(request);
+            const pricing = getPricing(headcount.count);
+            const phase = getTourPhase(request);
+            return { request, headcount, pricing, phase };
+        });
+    }, [requests]);
+
+    const stats = useMemo(() => {
+        const active = enriched.filter((item) => item.phase !== 'cancelled');
+        const upcoming = active.filter((item) => item.phase === 'upcoming');
+        const ongoing = active.filter((item) => item.phase === 'ongoing');
+        const finished = active.filter((item) => item.phase === 'finished');
+
+        const sumPeople = (items: typeof active) =>
+            items.reduce((acc, item) => acc + item.headcount.count, 0);
+        const sumTotal = (items: typeof active) =>
+            items.reduce((acc, item) => acc + item.pricing.total, 0);
+        const sumDeposit = (items: typeof active) =>
+            items.reduce((acc, item) => acc + item.pricing.deposit, 0);
+
+        return {
+            reservations: active.length,
+            peopleUpcoming: sumPeople(upcoming),
+            toursUpcoming: upcoming.length,
+            peopleOngoing: sumPeople(ongoing),
+            toursOngoing: ongoing.length,
+            peopleFinished: sumPeople(finished),
+            toursFinished: finished.length,
+            total: sumTotal(active),
+            deposit: sumDeposit(active),
+            remaining: sumTotal(active) - sumDeposit(active),
+        };
+    }, [enriched]);
+
+    const filtered = useMemo(() => {
+        const list = enriched.filter((item) => {
+            if (filter === 'a_venir') return item.phase === 'upcoming';
+            if (filter === 'en_visite') return item.phase === 'ongoing';
+            if (filter === 'termines') return item.phase === 'finished';
+            if (filter === 'annules') return item.phase === 'cancelled';
+            return true;
+        });
+
+        return [...list].sort((a, b) => {
+            const phaseDiff = PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase];
+            if (phaseDiff !== 0) return phaseDiff;
+            const dateA = parseLocalDate(a.request.date_arrivee)?.getTime() ?? 0;
+            const dateB = parseLocalDate(b.request.date_arrivee)?.getTime() ?? 0;
+            return dateA - dateB;
+        });
+    }, [enriched, filter]);
+
     const downloadCSV = () => {
-        if (requests.length === 0) return;
+        if (enriched.length === 0) return;
 
         const headers = [
             'ID',
@@ -143,6 +406,7 @@ export default function AdminChongqing() {
             'Email',
             'Téléphone',
             'Status',
+            'Phase',
             'Arrivée',
             'Départ',
             'Hébergement',
@@ -160,42 +424,52 @@ export default function AdminChongqing() {
             'Gastronomie',
             'Insolite',
             'Photo',
-            'Nb Personnes',
+            'Participants listés',
+            'Inscrit dans la liste',
+            'Nb Personnes (tarif)',
+            'Total €',
+            'Acompte 25% €',
+            'Solde €',
             'Date Soumission',
         ];
 
-        const rows = requests.map((r) => [
-            r.id,
-            r.prenom,
-            r.nom,
-            r.email,
-            r.telephone,
-            STATUS_CONFIG[r.status].label,
-            r.date_arrivee,
-            r.date_depart,
-            r.hebergement || '-',
-            r.mobilite || '-',
-            r.transport_prefere || '-',
-            r.rythme || '-',
-            r.restrictions || '-',
-            Array.isArray(r.langues) ? r.langues.join('; ') : r.langues || '-',
-            r.option_voiture_privee ? 'Oui' : 'Non',
-            r.deja_visite_chine ? 'Oui' : 'Non',
-            r.excursions_interet ? 'Oui' : 'Non',
-            r.pref_nature || '-',
-            r.pref_ville || '-',
-            r.pref_histoire || '-',
-            r.pref_gastronomie || '-',
-            r.pref_insolite || '-',
-            r.pref_photo || '-',
-            r.participants?.length || 0,
-            new Date(r.created_at).toLocaleDateString('fr-FR'),
+        const rows = enriched.map(({ request, headcount, pricing, phase }) => [
+            request.id,
+            request.prenom,
+            request.nom,
+            request.email,
+            request.telephone,
+            getStatusConfig(request.status).label,
+            PHASE_LABEL[phase].label,
+            request.date_arrivee,
+            request.date_depart,
+            request.hebergement || '-',
+            request.mobilite || '-',
+            request.transport_prefere || '-',
+            request.rythme || '-',
+            request.restrictions || '-',
+            Array.isArray(request.langues) ? request.langues.join('; ') : request.langues || '-',
+            request.option_voiture_privee ? 'Oui' : 'Non',
+            request.deja_visite_chine ? 'Oui' : 'Non',
+            request.excursions_interet ? 'Oui' : 'Non',
+            request.pref_nature || '-',
+            request.pref_ville || '-',
+            request.pref_histoire || '-',
+            request.pref_gastronomie || '-',
+            request.pref_insolite || '-',
+            request.pref_photo || '-',
+            headcount.listed,
+            headcount.registrantInList ? 'Oui' : 'Non',
+            headcount.count,
+            pricing.total,
+            pricing.deposit,
+            pricing.remaining,
+            new Date(request.created_at).toLocaleDateString('fr-FR'),
         ]);
 
-        const csv =
-            [headers, ...rows]
-                .map((row) => row.map((cell) => `"${cell}"`).join(','))
-                .join('\n');
+        const csv = [headers, ...rows]
+            .map((row) => row.map((cell) => `"${cell}"`).join(','))
+            .join('\n');
 
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -209,20 +483,8 @@ export default function AdminChongqing() {
         setLoading(true);
         setError(null);
         try {
-            const { data, error } = await supabase
-                .from('tour_requests')
-                .select('*')
-                .order('created_at', { ascending: false });
-
-            if (error) {
-                console.error('Erreur:', error);
-                setError(`Erreur: ${error.message}`);
-                setRequests([]);
-            } else {
-                setRequests(data || []);
-            }
+            await loadRequests();
         } catch (err) {
-            console.error('Erreur:', err);
             setError(`Erreur: ${String(err)}`);
             setRequests([]);
         } finally {
@@ -232,349 +494,479 @@ export default function AdminChongqing() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-orange-50 to-yellow-50">
-                <div className="text-xl font-semibold text-orange-600">
-                    ⏳ Chargement...
-                </div>
+            <div className="flex items-center justify-center min-h-screen bg-cream">
+                <div className="text-xl font-semibold text-ink">Chargement...</div>
             </div>
         );
     }
 
+    const filters: { id: FilterType; label: string; count: number }[] = [
+        { id: 'tous', label: 'Tous', count: enriched.length },
+        { id: 'a_venir', label: 'À venir', count: stats.toursUpcoming },
+        { id: 'en_visite', label: 'En visite', count: stats.toursOngoing },
+        { id: 'termines', label: 'Tours finis', count: stats.toursFinished },
+        {
+            id: 'annules',
+            label: 'Annulés',
+            count: enriched.filter((item) => item.phase === 'cancelled').length,
+        },
+    ];
+
     return (
-        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-yellow-50 to-orange-100 p-8">
+        <div className="min-h-screen bg-cream p-4 sm:p-8">
             <div className="max-w-7xl mx-auto">
-                {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-4xl font-bold text-orange-900 mb-2">
-                        🏔️ Admin Chongqing
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-ink mb-2">
+                        Admin Chongqing
                     </h1>
-                    <p className="text-orange-700 text-lg">
-                        {requests.length} réservation{requests.length > 1 ? 's' : ''} au total
+                    <p className="text-ink/80 text-base sm:text-lg font-medium">
+                        {stats.reservations} réservation{stats.reservations > 1 ? 's' : ''} active
+                        {stats.reservations > 1 ? 's' : ''} · {UNIT_PRICE} € / personne · acompte{' '}
+                        {DEPOSIT_RATE * 100} %
                     </p>
                 </div>
 
-                {/* Affiche les erreurs */}
                 {error && (
-                    <div className="mb-6 p-4 bg-red-100 border-l-4 border-red-500 text-red-700 rounded-lg">
-                        <p className="font-semibold">❌ {error}</p>
+                    <div className="mb-6 p-4 bg-red-100 border-l-4 border-red-600 text-red-800 rounded-lg">
+                        <p className="font-semibold">{error}</p>
                     </div>
                 )}
 
-                {/* Actions */}
-                <div className="mb-6 flex gap-4 flex-wrap">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
+                    <StatCard
+                        label="Personnes à venir"
+                        value={stats.peopleUpcoming}
+                        hint={`${stats.toursUpcoming} tour${stats.toursUpcoming > 1 ? 's' : ''}`}
+                        tone="sky"
+                    />
+                    <StatCard
+                        label="En visite maintenant"
+                        value={stats.peopleOngoing}
+                        hint={`${stats.toursOngoing} tour${stats.toursOngoing > 1 ? 's' : ''}`}
+                        tone="green"
+                    />
+                    <StatCard
+                        label="Visites déjà faites"
+                        value={stats.peopleFinished}
+                        hint={`${stats.toursFinished} tour${stats.toursFinished > 1 ? 's' : ''} fini${stats.toursFinished > 1 ? 's' : ''}`}
+                        tone="slate"
+                    />
+                    <StatCard
+                        label="Total à encaisser"
+                        value={formatEuro(stats.total)}
+                        hint="Hors annulations"
+                        tone="orange"
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mb-8">
+                    <div className="bg-white border-2 border-amber-300 rounded-2xl p-5 shadow-sm">
+                        <p className="text-sm font-semibold uppercase tracking-wide text-amber-800 mb-1">
+                            Acomptes 25 %
+                        </p>
+                        <p className="text-3xl sm:text-4xl font-extrabold text-amber-900">
+                            {formatEuro(stats.deposit)}
+                        </p>
+                        <p className="text-sm text-ink/70 mt-1">
+                            Montant d&apos;acompte attendu sur les tours actifs
+                        </p>
+                    </div>
+                    <div className="bg-white border-2 border-emerald-300 rounded-2xl p-5 shadow-sm">
+                        <p className="text-sm font-semibold uppercase tracking-wide text-emerald-800 mb-1">
+                            Soldes restants 75 %
+                        </p>
+                        <p className="text-3xl sm:text-4xl font-extrabold text-emerald-900">
+                            {formatEuro(stats.remaining)}
+                        </p>
+                        <p className="text-sm text-ink/70 mt-1">
+                            Reste à encaisser après les acomptes
+                        </p>
+                    </div>
+                </div>
+
+                <div className="mb-6 flex gap-3 flex-wrap">
                     <button
                         onClick={downloadCSV}
                         disabled={requests.length === 0}
-                        className="flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 bg-bamboo text-white px-5 py-3 rounded-xl font-semibold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Download size={20} />
                         Télécharger CSV
                     </button>
                     <button
                         onClick={handleRefresh}
-                        className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold transition-all"
+                        className="bg-apricot hover:opacity-90 text-white px-5 py-3 rounded-xl font-semibold transition-all"
                     >
-                        🔄 Actualiser
+                        Actualiser
                     </button>
                 </div>
 
-                {/* Réservations */}
-                {requests.length === 0 ? (
-                    <div className="text-center py-12 bg-white rounded-xl shadow-md">
-                        <p className="text-gray-500 text-lg">
-                            Aucune réservation pour le moment
+                <div className="mb-6 flex gap-2 flex-wrap">
+                    {filters.map((item) => (
+                        <button
+                            key={item.id}
+                            onClick={() => setFilter(item.id)}
+                            className={`px-4 py-2 rounded-full font-semibold text-sm border-2 transition-all ${
+                                filter === item.id
+                                    ? 'bg-ink text-white border-ink'
+                                    : 'bg-white text-ink border-ink/15 hover:border-ink/40'
+                            }`}
+                        >
+                            {item.label} ({item.count})
+                        </button>
+                    ))}
+                </div>
+
+                {filtered.length === 0 ? (
+                    <div className="text-center py-12 bg-white rounded-2xl shadow-sm border border-ink/10">
+                        <p className="text-ink/70 text-lg font-medium">
+                            Aucune réservation dans cette vue
                         </p>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {requests.map((request) => {
-                            const statusConfig = STATUS_CONFIG[request.status];
+                    <div className="space-y-5">
+                        {filtered.map(({ request, headcount, pricing, phase }) => {
+                            const statusConfig = getStatusConfig(request.status);
+                            const duration = stayDuration(
+                                request.date_arrivee,
+                                request.date_depart
+                            );
+                            const participants = getParticipants(request);
+                            const expanded = expandedId === request.id;
+                            const canMarkFinished =
+                                request.status !== 'termine' && request.status !== 'annule';
+
                             return (
                                 <div
                                     key={request.id}
-                                    className={`rounded-xl shadow-md hover:shadow-xl transition-all border-l-4 overflow-hidden ${request.status === 'nouveau'
-                                            ? 'border-blue-500 bg-white'
-                                            : request.status === 'en_cours'
-                                                ? 'border-yellow-500 bg-white'
-                                                : request.status === 'email_envoye'
-                                                    ? 'border-purple-500 bg-white'
-                                                    : request.status === 'confirme'
-                                                        ? 'border-green-500 bg-white'
-                                                        : 'border-red-500 bg-white'
-                                        }`}
+                                    className={`rounded-2xl bg-white shadow-md border-l-8 overflow-hidden ${statusConfig.border}`}
                                 >
-                                    {/* Header de la carte */}
                                     <div
                                         onClick={() =>
-                                            setExpandedId(expandedId === request.id ? null : request.id)
+                                            setExpandedId(expanded ? null : request.id)
                                         }
-                                        className="p-6 cursor-pointer hover:bg-orange-50 transition-colors"
+                                        className="p-5 sm:p-6 cursor-pointer hover:bg-sunshine/10 transition-colors"
                                     >
-                                        <div className="flex justify-between items-start md:items-center gap-4 flex-wrap md:flex-nowrap">
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-xl font-bold text-gray-800 break-words">
-                                                    {request.prenom} {request.nom}
-                                                </h3>
-                                                <div className="flex flex-wrap gap-3 mt-2 text-sm text-gray-600">
-                                                    <span>📧 {request.email}</span>
-                                                    <span>📱 {request.telephone}</span>
-                                                    <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                                                        👥 {request.participants?.length || 0} pers.
-                                                    </span>
+                                        <div className="flex flex-col gap-4">
+                                            <div className="flex justify-between items-start gap-3">
+                                                <div className="min-w-0">
+                                                    <h3 className="text-2xl font-extrabold text-ink wrap-break-word">
+                                                        {request.prenom} {request.nom}
+                                                    </h3>
+                                                    <div className="flex flex-wrap gap-2 mt-3">
+                                                        <span
+                                                            className={`px-3 py-1.5 rounded-full font-bold text-sm ${statusConfig.bgColor} ${statusConfig.color}`}
+                                                        >
+                                                            {statusConfig.label}
+                                                        </span>
+                                                        <span
+                                                            className={`px-3 py-1.5 rounded-full font-bold text-sm ${PHASE_LABEL[phase].className}`}
+                                                        >
+                                                            {PHASE_LABEL[phase].label}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteRequest(request.id);
+                                                        }}
+                                                        className="p-2 hover:bg-red-100 rounded-lg text-red-600"
+                                                        title="Supprimer"
+                                                    >
+                                                        <Trash2 size={22} />
+                                                    </button>
+                                                    <ChevronDown
+                                                        size={28}
+                                                        className={`text-apricot transition-transform ${expanded ? 'rotate-180' : ''}`}
+                                                    />
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-4 flex-wrap justify-end">
-                                                {/* Badge Status */}
-                                                <span
-                                                    className={`px-3 py-2 rounded-full font-semibold text-sm whitespace-nowrap ${statusConfig.bgColor} ${statusConfig.color}`}
-                                                >
-                                                    {statusConfig.label}
-                                                </span>
-                                                <div className="text-right whitespace-nowrap">
-                                                    <p className="text-xs text-gray-500">Soumis le</p>
-                                                    <p className="font-semibold text-orange-600 text-sm">
-                                                        {new Date(request.created_at).toLocaleDateString(
-                                                            'fr-FR'
-                                                        )}
-                                                    </p>
-                                                </div>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteRequest(request.id);
-                                                    }}
-                                                    className="p-2 hover:bg-red-100 rounded-lg transition-colors text-red-500 flex-shrink-0"
-                                                    title="Supprimer"
-                                                >
-                                                    <Trash2 size={20} />
-                                                </button>
-                                                <ChevronDown
-                                                    size={24}
-                                                    className={`text-orange-500 transition-transform flex-shrink-0 ${expandedId === request.id ? 'rotate-180' : ''
-                                                        }`}
+
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                                <InfoChip
+                                                    icon={<CalendarDays size={18} />}
+                                                    label="Dates"
+                                                    value={`${formatLongDate(request.date_arrivee)} → ${formatLongDate(request.date_depart)}`}
+                                                    extra={duration ? `${duration} jour${duration > 1 ? 's' : ''}` : undefined}
                                                 />
+                                                <InfoChip
+                                                    icon={<Users size={18} />}
+                                                    label="Personnes"
+                                                    value={`${headcount.count} pers.`}
+                                                    extra={
+                                                        headcount.registrantAdded
+                                                            ? `${headcount.listed} listé${headcount.listed > 1 ? 's' : ''} + inscrit`
+                                                            : 'Inscrit déjà dans la liste'
+                                                    }
+                                                />
+                                                <InfoChip
+                                                    icon={<Wallet size={18} />}
+                                                    label="Total"
+                                                    value={formatEuro(pricing.total)}
+                                                    extra={`${UNIT_PRICE} € × ${headcount.count}`}
+                                                    emphasize
+                                                />
+                                                <InfoChip
+                                                    icon={<CheckCircle2 size={18} />}
+                                                    label="Acompte / solde"
+                                                    value={formatEuro(pricing.deposit)}
+                                                    extra={`Reste ${formatEuro(pricing.remaining)}`}
+                                                />
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-x-5 gap-y-2 text-base font-medium text-ink">
+                                                <span className="inline-flex items-center gap-2">
+                                                    <Mail size={16} className="text-ink/60" />
+                                                    {request.email}
+                                                </span>
+                                                <span className="inline-flex items-center gap-2">
+                                                    <Phone size={16} className="text-ink/60" />
+                                                    {request.telephone}
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Contenu expandable */}
-                                    {expandedId === request.id && (
-                                        <div className="border-t border-gray-200 p-6 bg-gradient-to-r from-orange-50 to-yellow-50 space-y-6">
-
-                                            {/* ===== BARRE STATUS ===== */}
-                                            <div className="bg-white p-4 rounded-lg border-2 border-orange-200">
-                                                <h4 className="font-semibold text-gray-800 mb-4">🎯 Modifier le Status</h4>
+                                    {expanded && (
+                                        <div className="border-t-2 border-ink/10 p-5 sm:p-6 bg-sunshine/10 space-y-5">
+                                            <div className="bg-white p-4 rounded-xl border-2 border-ink/10">
+                                                <h4 className="font-bold text-ink text-lg mb-3">
+                                                    Modifier le statut
+                                                </h4>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {(Object.keys(STATUS_CONFIG) as StatusType[]).map((status) => {
-                                                        const config = STATUS_CONFIG[status];
-                                                        return (
-                                                            <button
-                                                                key={status}
-                                                                onClick={() => updateStatus(request.id, status)}
-                                                                disabled={updatingId === request.id || request.status === status}
-                                                                className={`px-4 py-2 rounded-lg font-semibold transition-all ${request.status === status
-                                                                        ? `${config.bgColor} ${config.color} ring-2 ring-offset-2`
-                                                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                                    {(Object.keys(STATUS_CONFIG) as StatusType[]).map(
+                                                        (status) => {
+                                                            const config = STATUS_CONFIG[status];
+                                                            return (
+                                                                <button
+                                                                    key={status}
+                                                                    onClick={() =>
+                                                                        updateStatus(request.id, status)
+                                                                    }
+                                                                    disabled={
+                                                                        updatingId === request.id ||
+                                                                        request.status === status
+                                                                    }
+                                                                    className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                                                                        request.status === status
+                                                                            ? `${config.bgColor} ${config.color} ring-2 ring-offset-2 ring-ink/30`
+                                                                            : 'bg-ink/10 text-ink hover:bg-ink/15'
                                                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                                            >
-                                                                {config.label}
-                                                            </button>
-                                                        );
-                                                    })}
+                                                                >
+                                                                    {config.label}
+                                                                </button>
+                                                            );
+                                                        }
+                                                    )}
                                                 </div>
+                                                {canMarkFinished && (
+                                                    <button
+                                                        onClick={() =>
+                                                            updateStatus(request.id, 'termine')
+                                                        }
+                                                        disabled={updatingId === request.id}
+                                                        className="mt-3 inline-flex items-center gap-2 bg-slate-800 text-white px-4 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-700 disabled:opacity-50"
+                                                    >
+                                                        <CheckCircle2 size={18} />
+                                                        Marquer le tour comme fini
+                                                    </button>
+                                                )}
                                             </div>
 
-                                            {/* ===== INFOS PERSONNELLES ===== */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-blue-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-blue-900 mb-2">👤 Nom Complet</h4>
-                                                    <p className="text-gray-700">{request.prenom} {request.nom}</p>
+                                            <div className="bg-white p-4 rounded-xl border-2 border-emerald-200">
+                                                <h4 className="font-bold text-ink text-lg mb-3">
+                                                    Tarif automatique
+                                                </h4>
+                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                    <PriceBox
+                                                        label="Personnes"
+                                                        value={`${headcount.count}`}
+                                                    />
+                                                    <PriceBox
+                                                        label="Prix unitaire"
+                                                        value={formatEuro(UNIT_PRICE)}
+                                                    />
+                                                    <PriceBox
+                                                        label="Total"
+                                                        value={formatEuro(pricing.total)}
+                                                        highlight
+                                                    />
+                                                    <PriceBox
+                                                        label="Acompte 25 %"
+                                                        value={formatEuro(pricing.deposit)}
+                                                    />
                                                 </div>
-                                                <div className="bg-blue-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-blue-900 mb-2">📧 Email</h4>
-                                                    <p className="text-gray-700 break-all">{request.email}</p>
-                                                </div>
-                                                <div className="bg-blue-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-blue-900 mb-2">📱 Téléphone</h4>
-                                                    <p className="text-gray-700">{request.telephone}</p>
-                                                </div>
-                                                <div className="bg-blue-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-blue-900 mb-2">📅 Date Création</h4>
-                                                    <p className="text-gray-700">
-                                                        {new Date(request.created_at).toLocaleDateString('fr-FR', {
+                                                <p className="mt-3 text-base font-semibold text-ink">
+                                                    Solde restant : {formatEuro(pricing.remaining)}
+                                                </p>
+                                                {headcount.registrantAdded && (
+                                                    <p className="mt-2 text-sm font-medium text-amber-900 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                                        L&apos;inscrit ({request.prenom} {request.nom}) n&apos;est
+                                                        pas dans la liste des participants : il est ajouté
+                                                        automatiquement au tarif.
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <DetailBox title="Nom complet">
+                                                    {request.prenom} {request.nom}
+                                                </DetailBox>
+                                                <DetailBox title="Email">{request.email}</DetailBox>
+                                                <DetailBox title="Téléphone">
+                                                    {request.telephone}
+                                                </DetailBox>
+                                                <DetailBox title="Date de création">
+                                                    {new Date(request.created_at).toLocaleDateString(
+                                                        'fr-FR',
+                                                        {
                                                             year: 'numeric',
                                                             month: 'long',
                                                             day: 'numeric',
                                                             hour: '2-digit',
                                                             minute: '2-digit',
-                                                        })}
-                                                    </p>
-                                                </div>
+                                                        }
+                                                    )}
+                                                </DetailBox>
                                             </div>
 
-                                            {/* ===== DATES & HÉBERGEMENT ===== */}
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div className="bg-green-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-green-900 mb-2">🛫 Date Arrivée</h4>
-                                                    <p className="text-gray-700">
-                                                        {new Date(request.date_arrivee).toLocaleDateString('fr-FR', {
-                                                            weekday: 'long',
-                                                            year: 'numeric',
-                                                            month: 'long',
-                                                            day: 'numeric',
-                                                        })}
-                                                    </p>
-                                                </div>
-                                                <div className="bg-green-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-green-900 mb-2">🛬 Date Départ</h4>
-                                                    <p className="text-gray-700">
-                                                        {new Date(request.date_depart).toLocaleDateString('fr-FR', {
-                                                            weekday: 'long',
-                                                            year: 'numeric',
-                                                            month: 'long',
-                                                            day: 'numeric',
-                                                        })}
-                                                    </p>
-                                                </div>
-                                                <div className="bg-green-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-green-900 mb-2">🏨 Type Hébergement</h4>
-                                                    <p className="text-gray-700 font-medium">{request.hebergement || '—'}</p>
-                                                </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                                <DetailBox title="Arrivée">
+                                                    {formatLongDate(request.date_arrivee)}
+                                                </DetailBox>
+                                                <DetailBox title="Départ">
+                                                    {formatLongDate(request.date_depart)}
+                                                </DetailBox>
+                                                <DetailBox title="Hébergement">
+                                                    {request.hebergement || '—'}
+                                                </DetailBox>
+                                                <DetailBox title="Durée">
+                                                    {duration
+                                                        ? `${duration} jour${duration > 1 ? 's' : ''}`
+                                                        : '—'}
+                                                </DetailBox>
+                                                <DetailBox title="Mobilité">
+                                                    {request.mobilite || '—'}
+                                                </DetailBox>
+                                                <DetailBox title="Voiture privée">
+                                                    {request.option_voiture_privee ? 'Oui' : 'Non'}
+                                                </DetailBox>
                                             </div>
 
-                                            {/* ===== DURÉE & MOBILITÉ ===== */}
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                                <div className="bg-purple-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-purple-900 mb-2">⏱️ Durée du séjour</h4>
-                                                    <p className="text-gray-700 font-semibold text-lg">
-                                                        {Math.ceil((new Date(request.date_depart).getTime() - new Date(request.date_arrivee).getTime()) / (1000 * 60 * 60 * 24))} jours
-                                                    </p>
-                                                </div>
-                                                <div className="bg-purple-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-purple-900 mb-2">♿ Mobilité</h4>
-                                                    <p className="text-gray-700 capitalize font-medium">{request.mobilite || '—'}</p>
-                                                </div>
-                                                <div className="bg-purple-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-purple-900 mb-2">🚗 Voiture Privée</h4>
-                                                    <p className="text-gray-700 font-semibold">{request.option_voiture_privee ? '✅ Oui' : '❌ Non'}</p>
-                                                </div>
-                                            </div>
-
-                                            {/* ===== PARTICIPANTS ===== */}
-                                            {Array.isArray(request.participants) && request.participants.length > 0 && (
-                                                <div className="bg-pink-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-pink-900 mb-4">👥 Participants ({request.participants.length})</h4>
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                        {request.participants.map((p, idx) => (
-                                                            <div key={idx} className="bg-white p-3 rounded border-l-4 border-pink-400">
-                                                                <p className="font-semibold text-gray-800">{p.prenom} {p.nom || ''}</p>
-                                                                <p className="text-sm text-gray-600">🎂 {p.age} ans</p>
-                                                            </div>
-                                                        ))}
+                                            <div className="bg-white p-4 rounded-xl border-2 border-pink-200">
+                                                <h4 className="font-bold text-ink text-lg mb-3">
+                                                    Groupe ({headcount.count} pers.)
+                                                </h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <div className="bg-apricot/15 p-3 rounded-xl border-l-4 border-apricot">
+                                                        <p className="text-xs font-bold uppercase text-apricot">
+                                                            Inscrit
+                                                        </p>
+                                                        <p className="font-bold text-ink text-lg">
+                                                            {request.prenom} {request.nom}
+                                                        </p>
+                                                        <p className="text-sm font-medium text-ink/70">
+                                                            {headcount.registrantInList
+                                                                ? 'Présent dans la liste participants'
+                                                                : 'Ajouté au décompte tarifaire'}
+                                                        </p>
                                                     </div>
+                                                    {participants.map((p, idx) => (
+                                                        <div
+                                                            key={`${p.prenom}-${idx}`}
+                                                            className="bg-pink-50 p-3 rounded-xl border-l-4 border-pink-400"
+                                                        >
+                                                            <p className="text-xs font-bold uppercase text-pink-700">
+                                                                Participant
+                                                            </p>
+                                                            <p className="font-bold text-ink text-lg">
+                                                                {p.prenom} {p.nom || ''}
+                                                            </p>
+                                                            <p className="text-sm font-medium text-ink/70">
+                                                                {p.age ? `${p.age} ans` : 'Âge non renseigné'}
+                                                            </p>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            )}
+                                            </div>
 
-                                            {/* ===== LANGUES ===== */}
-                                            {Array.isArray(request.langues) && request.langues.length > 0 && (
-                                                <div className="bg-indigo-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-indigo-900 mb-3">🗣️ Langues Parlées</h4>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {request.langues.map((l, idx) => (
-                                                            <span
-                                                                key={idx}
-                                                                className="bg-indigo-200 text-indigo-800 px-3 py-1 rounded-full text-sm font-medium"
-                                                            >
-                                                                {l}
-                                                            </span>
-                                                        ))}
+                                            {Array.isArray(request.langues) &&
+                                                request.langues.length > 0 && (
+                                                    <div className="bg-white p-4 rounded-xl border-2 border-indigo-200">
+                                                        <h4 className="font-bold text-ink text-lg mb-3">
+                                                            Langues parlées
+                                                        </h4>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {request.langues.map((langue) => (
+                                                                <span
+                                                                    key={langue}
+                                                                    className="bg-indigo-100 text-indigo-900 px-3 py-1.5 rounded-full text-sm font-bold"
+                                                                >
+                                                                    {langue}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
 
-                                            {/* ===== RESTRICTIONS ALIMENTAIRES ===== */}
                                             {request.restrictions && (
-                                                <div className="bg-red-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-red-900 mb-3">🚫 Restrictions Alimentaires</h4>
-                                                    <p className="text-gray-700 whitespace-pre-wrap">{request.restrictions}</p>
-                                                </div>
+                                                <DetailBox title="Restrictions alimentaires">
+                                                    {request.restrictions}
+                                                </DetailBox>
                                             )}
 
-                                            {/* ===== TRANSPORT & RYTHME ===== */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-teal-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-teal-900 mb-2">🚌 Transport Préféré</h4>
-                                                    <p className="text-gray-700 capitalize font-medium">{request.transport_prefere || '—'}</p>
-                                                </div>
-                                                <div className="bg-teal-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-teal-900 mb-2">⏰ Rythme de Visite</h4>
-                                                    <p className="text-gray-700 capitalize font-medium">{request.rythme || '—'}</p>
-                                                </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <DetailBox title="Transport préféré">
+                                                    {request.transport_prefere || '—'}
+                                                </DetailBox>
+                                                <DetailBox title="Rythme de visite">
+                                                    {request.rythme || '—'}
+                                                </DetailBox>
                                             </div>
 
-                                            {/* ===== PRÉFÉRENCES (1-5) ===== */}
-                                            <div className="bg-gray-50 p-4 rounded-lg">
-                                                <h4 className="font-semibold text-gray-800 mb-4">⭐ Préférences d&apos;Activités (échelle 1-5)</h4>
+                                            <div className="bg-white p-4 rounded-xl border-2 border-ink/10">
+                                                <h4 className="font-bold text-ink text-lg mb-3">
+                                                    Préférences (1-5)
+                                                </h4>
                                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                                    <div className="bg-white p-3 rounded border-l-4 border-blue-400">
-                                                        <p className="text-sm font-medium text-gray-700">🌲 Nature</p>
-                                                        <p className="text-2xl font-bold text-blue-600">{request.pref_nature || '—'}/5</p>
-                                                    </div>
-                                                    <div className="bg-white p-3 rounded border-l-4 border-blue-400">
-                                                        <p className="text-sm font-medium text-gray-700">🏙️ Ville</p>
-                                                        <p className="text-2xl font-bold text-blue-600">{request.pref_ville || '—'}/5</p>
-                                                    </div>
-                                                    <div className="bg-white p-3 rounded border-l-4 border-blue-400">
-                                                        <p className="text-sm font-medium text-gray-700">🏛️ Histoire</p>
-                                                        <p className="text-2xl font-bold text-blue-600">{request.pref_histoire || '—'}/5</p>
-                                                    </div>
-                                                    <div className="bg-white p-3 rounded border-l-4 border-blue-400">
-                                                        <p className="text-sm font-medium text-gray-700">🍽️ Gastronomie</p>
-                                                        <p className="text-2xl font-bold text-blue-600">{request.pref_gastronomie || '—'}/5</p>
-                                                    </div>
-                                                    <div className="bg-white p-3 rounded border-l-4 border-blue-400">
-                                                        <p className="text-sm font-medium text-gray-700">✨ Insolite</p>
-                                                        <p className="text-2xl font-bold text-blue-600">{request.pref_insolite || '—'}/5</p>
-                                                    </div>
-                                                    <div className="bg-white p-3 rounded border-l-4 border-blue-400">
-                                                        <p className="text-sm font-medium text-gray-700">📸 Photo</p>
-                                                        <p className="text-2xl font-bold text-blue-600">{request.pref_photo || '—'}/5</p>
-                                                    </div>
+                                                    <PrefBox label="Nature" value={request.pref_nature} />
+                                                    <PrefBox label="Ville" value={request.pref_ville} />
+                                                    <PrefBox
+                                                        label="Histoire"
+                                                        value={request.pref_histoire}
+                                                    />
+                                                    <PrefBox
+                                                        label="Gastronomie"
+                                                        value={request.pref_gastronomie}
+                                                    />
+                                                    <PrefBox
+                                                        label="Insolite"
+                                                        value={request.pref_insolite}
+                                                    />
+                                                    <PrefBox label="Photo" value={request.pref_photo} />
                                                 </div>
                                             </div>
 
-                                            {/* ===== EXPÉRIENCE CHINE ===== */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="bg-orange-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-orange-900 mb-2">🇨🇳 Déjà visité la Chine ?</h4>
-                                                    <p className="text-gray-700 font-semibold text-lg">
-                                                        {request.deja_visite_chine ? '✅ Oui' : '❌ Non'}
-                                                    </p>
-                                                </div>
-                                                <div className="bg-orange-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-orange-900 mb-2">🧗 Intérêt pour Excursions</h4>
-                                                    <p className="text-gray-700 font-semibold text-lg">
-                                                        {request.excursions_interet ? '✅ Oui' : '❌ Non'}
-                                                    </p>
-                                                </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                <DetailBox title="Déjà visité la Chine ?">
+                                                    {request.deja_visite_chine ? 'Oui' : 'Non'}
+                                                </DetailBox>
+                                                <DetailBox title="Intérêt pour les excursions">
+                                                    {request.excursions_interet ? 'Oui' : 'Non'}
+                                                </DetailBox>
                                             </div>
 
-                                            {/* ===== COMMENTAIRES ===== */}
                                             {request.commentaires && (
-                                                <div className="bg-lime-50 p-4 rounded-lg">
-                                                    <h4 className="font-semibold text-lime-900 mb-3">💬 Commentaires & Notes</h4>
-                                                    <p className="text-gray-700 whitespace-pre-wrap bg-white p-3 rounded border-l-4 border-lime-400">
-                                                        {request.commentaires}
-                                                    </p>
-                                                </div>
+                                                <DetailBox title="Commentaires">
+                                                    {request.commentaires}
+                                                </DetailBox>
                                             )}
 
-                                            {/* ===== ID UNIQUE ===== */}
-                                            <div className="bg-gray-100 p-3 rounded-lg text-center">
-                                                <p className="text-xs text-gray-600 mb-1">ID de la réservation</p>
-                                                <p className="font-mono text-sm text-gray-800 break-all">{request.id}</p>
-                                            </div>
-
+                                            <p className="text-xs font-mono text-ink/50 break-all text-center">
+                                                {request.id}
+                                            </p>
                                         </div>
                                     )}
                                 </div>
@@ -583,6 +975,117 @@ export default function AdminChongqing() {
                     </div>
                 )}
             </div>
+        </div>
+    );
+}
+
+function StatCard({
+    label,
+    value,
+    hint,
+    tone,
+}: {
+    label: string;
+    value: string | number;
+    hint: string;
+    tone: 'sky' | 'green' | 'slate' | 'orange';
+}) {
+    const tones = {
+        sky: 'border-blue-400 text-blue-900',
+        green: 'border-bamboo text-green-900',
+        slate: 'border-slate-400 text-slate-900',
+        orange: 'border-apricot text-orange-900',
+    };
+
+    return (
+        <div className={`bg-white border-2 rounded-2xl p-4 sm:p-5 shadow-sm ${tones[tone]}`}>
+            <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-ink/70 mb-1">
+                {label}
+            </p>
+            <p className="text-3xl sm:text-4xl font-extrabold leading-tight">{value}</p>
+            <p className="text-sm font-medium text-ink/70 mt-1">{hint}</p>
+        </div>
+    );
+}
+
+function InfoChip({
+    icon,
+    label,
+    value,
+    extra,
+    emphasize = false,
+}: {
+    icon: ReactNode;
+    label: string;
+    value: string;
+    extra?: string;
+    emphasize?: boolean;
+}) {
+    return (
+        <div
+            className={`rounded-xl p-3 border-2 ${
+                emphasize
+                    ? 'bg-emerald-50 border-emerald-300'
+                    : 'bg-ink/5 border-ink/10'
+            }`}
+        >
+            <p className="text-xs font-bold uppercase tracking-wide text-ink/60 flex items-center gap-1.5 mb-1">
+                {icon}
+                {label}
+            </p>
+            <p className="text-base sm:text-lg font-extrabold text-ink leading-snug">
+                {value}
+            </p>
+            {extra && (
+                <p className="text-sm font-medium text-ink/70 mt-0.5">{extra}</p>
+            )}
+        </div>
+    );
+}
+
+function PriceBox({
+    label,
+    value,
+    highlight = false,
+}: {
+    label: string;
+    value: string;
+    highlight?: boolean;
+}) {
+    return (
+        <div
+            className={`rounded-xl p-3 ${
+                highlight ? 'bg-emerald-100' : 'bg-ink/5'
+            }`}
+        >
+            <p className="text-xs font-bold uppercase text-ink/60">{label}</p>
+            <p className="text-xl font-extrabold text-ink">{value}</p>
+        </div>
+    );
+}
+
+function DetailBox({
+    title,
+    children,
+}: {
+    title: string;
+    children: ReactNode;
+}) {
+    return (
+        <div className="bg-white p-4 rounded-xl border-2 border-ink/10">
+            <h4 className="font-bold text-ink mb-1">{title}</h4>
+            <p className="text-base font-medium text-ink whitespace-pre-wrap wrap-break-word">
+                {children}
+            </p>
+        </div>
+    );
+}
+
+function PrefBox({ label, value }: { label: string; value: number }) {
+    return (
+        <div className="bg-ink/5 p-3 rounded-xl">
+            <p className="text-sm font-semibold text-ink/70">{label}</p>
+            <p className="text-2xl font-extrabold text-ink">{value || '—'}/5</p>
         </div>
     );
 }
