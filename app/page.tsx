@@ -54,9 +54,10 @@ export default function Home() {
                         <span className="block text-ink/50">comme on ne la voit pas dans les guides.</span>
                     </h1>
                     <p className="mt-6 text-lg sm:text-xl text-ink/70 max-w-2xl leading-relaxed">
-                        Je m’appelle Mattis. J’habite ici, et je construis chaque journée autour
-                        de toi : l’histoire de la ville, la cuisine, les points de vue, et ce
-                        que la Chine est devenue — raconté depuis le terrain.
+                        J&apos;ai envie de vous faire découvrir ma ville comme je la connais vraiment.
+                        <br /><br />
+                        Ses coins préférés, sa nourriture, ses beaux points de vue et toutes les
+                        petites expériences qu&apos;on ne trouve pas forcément dans les guides.
                     </p>
                     <div className="mt-8 flex flex-wrap gap-3">
                         <Link
