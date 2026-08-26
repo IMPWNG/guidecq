@@ -3,11 +3,11 @@ import Link from 'next/link'
 export default function PublicHeader() {
     return (
         <header className="sticky top-0 z-40 bg-cream/90 backdrop-blur-md border-b border-ink/10">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-                <Link href="/" className="font-extrabold text-ink tracking-tight">
-                    Mattis
-                    <span className="text-apricot"> · </span>
-                    Chongqing
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 min-h-16 py-3 flex items-center justify-between gap-3">
+                <Link href="/" className="font-extrabold text-ink tracking-tight text-sm sm:text-base leading-snug pr-3">
+                    Mat
+                    <span className="text-apricot"> — </span>
+                    Le Meilleur guide de Chongqing
                 </Link>
                 <nav className="flex items-center gap-4 sm:gap-6 text-sm font-semibold">
                     <Link href="/#savoir-faire" className="text-ink/70 hover:text-ink hidden sm:inline">

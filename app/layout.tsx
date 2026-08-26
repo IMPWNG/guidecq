@@ -8,7 +8,7 @@ const poppins = Poppins({
 })
 
 export const metadata: Metadata = {
-  title: 'Mattis · Guide à Chongqing',
+  title: 'Mat - Le Meilleur guide de Chongqing',
   description:
     'Journées guidées sur mesure à Chongqing : histoire, culture, nourriture et regard local. 9h–16h, 85 € par personne.',
 }

@@ -14,28 +14,47 @@ import TourForm from '@/components/TourForm'
 
 const REVIEWS = [
     {
-        quote: 'Culture, histoire, économie, nourriture : tout est alimenté par tes connaissances du monde, de la Chine et de Chongqing. Ton adaptation de parcours a été top.',
-        meta: 'Une voyageuse',
+        name: 'Quentin',
+        quote: `Mec, c’était incroyable de découvrir Chongqing comme tu me l’as fait découvrir. Pour une première fois ici et pour un premier jour, je pouvais difficilement espérer mieux !
+Au-delà d’une découverte authentique de la ville, de ses quartiers et de ses bâtiments plus anciens, c’est surtout toute une vision de Chongqing que tu as essayé de me transmettre.
+On ne s’est pas juste baladés à travers les 12 000 escaliers de la ville 😅 tu m’as raconté énormément d’histoires, que ce soit sur ton expérience personnelle, l’histoire de la ville, mais aussi plus largement sur la Chine et son évolution.
+
+Clairement, il y a un avant et un après cette visite 👀
+
+Le seul point négatif de la journée (si je dois en trouver un) c’est que je n’ai pas plus de temps à Chongqing pour en refaire une deuxième avec toi 🫣
+
+Encore merci mec, c’était vraiment une journée incroyable !`,
     },
     {
-        quote: 'Tu as été un guide exceptionnel, très gentil, patient et passionné. Grâce à toi, j’ai pu découvrir la ville d’une manière unique. Je garderai un très bon souvenir de cette journée.',
-        meta: 'Un voyageur',
+        name: 'Flo',
+        quote: `Bonsoir Mat, je t'avoue que j'avais un peu peur en réservant via insta.
+Mais alors quelle belle surprise à été cette journée j'ai appris sur l'histoire de la ville, la culture de la population mais aussi sur la Chine en général , avec ton point de vue et ton vécu ici.
+En tout cas je donnerai ton contact si des gens ont besoin continues ces belles visites et les belles idées que tu as en tête pour faire encore plus découvrir cette belle ville`,
     },
     {
-        quote: 'J’avais un peu peur en réservant via Insta. Quelle belle surprise. J’ai appris l’histoire de la ville, la culture, et la Chine en général — avec ton point de vue et ton vécu ici. Je donnerai ton contact.',
-        meta: 'Une voyageuse',
+        name: 'Mathieu',
+        quote: `Merci beaucoup pour cette magnifique journée à Chongqing !
+Tu as été un guide exceptionnel, très gentil, patient et passionné.
+Grâce à toi, j'ai pu découvrir la ville d'une manière unique et vivre une super expérience.
+Merci encore pour ton temps, tes conseils et ta bonne humeur. Je garderai un très bon souvenir de Chongqing et de cette journée avec toi. J'espère avoir l'occasion de te revoir un jour`,
     },
     {
-        quote: 'On ne s’est pas juste baladés. Tu m’as raconté énormément d’histoires, sur ton expérience, l’histoire de la ville, et plus largement la Chine. Clairement, il y a un avant et un après cette visite.',
-        meta: 'Un voyageur',
+        name: 'Walid',
+        quote: `c'était incroyable tu m'as fait découvrir Chongqing comme je n'aurais pas pu la decouvrir par moi-même, tu m'as appris plus de choses sur l'histoire de la ville qu'on peut le faire par nous-mêmes grâce à toi j'ai pu expérimenter de nouvelles choses voir de nouveaux horizons et surtout me faire ma propre idée de cette ville, tu m'as permis d'apprécier chaque petit détail ta compagnie a été essentiel. Merci beaucoup Mat je reviendrai te voir à chaque fois que je reviendrai dans cette ville.`,
     },
     {
-        quote: 'Tu m’as fait découvrir Chongqing comme je n’aurais pas pu la découvrir par moi-même. Ta compagnie a été essentielle. Je reviendrai te voir à chaque fois que je reviendrai dans cette ville.',
-        meta: 'Un voyageur',
+        name: 'Soiz',
+        quote: `Merci Mattis pour cette journée où culture, histoire, économie, nourriture sont alimentés par tes connaissances du monde, de la Chine et de Chongching (la ville que tu as choisie). Ton adaptation de parcours a été Top.`,
     },
     {
-        quote: 'Journée incroyable malgré la chaleur. Tu m’as fait découvrir des spots géniaux. Je n’hésiterai pas à transmettre ton contact. Au plaisir de te revoir pour une nouvelle excursion.',
-        meta: 'Une voyageuse',
+        name: 'Sheri',
+        quote: `Bonsoir Mat, merci pour la journée bien programmée d' aujourd'hui.
+Elle était incroyable malgré cette lourde chaleur mide ).
+Tu m as fait découvrir des spots géniaux. Je n'hésiterai pas à transmettre ton contact à mon entourage. Au plaisir de te revoir pour une nouvelle excursion`,
+    },
+    {
+        name: 'Matheo',
+        quote: `Merci encore pour la visite, très content d’avoir pu découvrir un chongqing que je n’imaginais pas ! C’est pile dans l’esprit que je voulais pour mon voyage ! Mention spéciale au resto du midi qui a participé à rendre la visite inoubliable !`,
     },
 ]
 
@@ -142,7 +161,7 @@ export default function Home() {
                         <div className="grid md:grid-cols-2 gap-4">
                             {REVIEWS.map((review) => (
                                 <figure
-                                    key={review.quote}
+                                    key={review.name}
                                     className="bg-cream rounded-3xl p-6 border border-ink/10"
                                 >
                                     <Quote
@@ -150,11 +169,11 @@ export default function Home() {
                                         className="text-apricot mb-3"
                                         aria-hidden
                                     />
-                                    <blockquote className="text-[15px] sm:text-base leading-relaxed text-ink">
+                                    <blockquote className="text-[15px] sm:text-base leading-relaxed text-ink whitespace-pre-line">
                                         {review.quote}
                                     </blockquote>
                                     <figcaption className="mt-4 text-sm font-semibold text-ink/45">
-                                        {review.meta}
+                                        {review.name}
                                     </figcaption>
                                 </figure>
                             ))}
@@ -210,7 +229,7 @@ export default function Home() {
             </main>
 
             <footer className="border-t border-ink/10 py-8 text-center text-sm text-ink/45">
-                Mattis · Guide à Chongqing
+                Mat - Le Meilleur guide de Chongqing
             </footer>
         </div>
     )
