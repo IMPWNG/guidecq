@@ -1,85 +1,236 @@
 import Link from 'next/link'
-import { Mountain, Building2, Landmark, Utensils, Sparkles } from 'lucide-react'
+import type { ReactNode } from 'react'
+import {
+    Clock,
+    Compass,
+    Landmark,
+    Map,
+    Quote,
+    Utensils,
+    Users,
+} from 'lucide-react'
+import PublicHeader from '@/components/PublicHeader'
+import TourForm from '@/components/TourForm'
+
+const REVIEWS = [
+    {
+        quote: 'Culture, histoire, économie, nourriture : tout est alimenté par tes connaissances du monde, de la Chine et de Chongqing. Ton adaptation de parcours a été top.',
+        meta: 'Une voyageuse',
+    },
+    {
+        quote: 'Tu as été un guide exceptionnel, très gentil, patient et passionné. Grâce à toi, j’ai pu découvrir la ville d’une manière unique. Je garderai un très bon souvenir de cette journée.',
+        meta: 'Un voyageur',
+    },
+    {
+        quote: 'J’avais un peu peur en réservant via Insta. Quelle belle surprise. J’ai appris l’histoire de la ville, la culture, et la Chine en général — avec ton point de vue et ton vécu ici. Je donnerai ton contact.',
+        meta: 'Une voyageuse',
+    },
+    {
+        quote: 'On ne s’est pas juste baladés. Tu m’as raconté énormément d’histoires, sur ton expérience, l’histoire de la ville, et plus largement la Chine. Clairement, il y a un avant et un après cette visite.',
+        meta: 'Un voyageur',
+    },
+    {
+        quote: 'Tu m’as fait découvrir Chongqing comme je n’aurais pas pu la découvrir par moi-même. Ta compagnie a été essentielle. Je reviendrai te voir à chaque fois que je reviendrai dans cette ville.',
+        meta: 'Un voyageur',
+    },
+    {
+        quote: 'Journée incroyable malgré la chaleur. Tu m’as fait découvrir des spots géniaux. Je n’hésiterai pas à transmettre ton contact. Au plaisir de te revoir pour une nouvelle excursion.',
+        meta: 'Une voyageuse',
+    },
+]
 
 export default function Home() {
-  return (
-    <main className="relative w-screen h-screen overflow-hidden flex flex-col items-center justify-center px-4 md:px-6 text-center bg-gradient-to-br from-sunshine via-apricot to-sky">
+    return (
+        <div className="min-h-screen bg-cream text-ink">
+            <PublicHeader />
 
-      {/* Formes décoratives flottantes */}
-      <div className="absolute top-10 left-10 w-24 h-24 bg-white/20 rounded-full blur-sm" />
-      <div className="absolute bottom-20 right-10 w-32 h-32 bg-bamboo/30 rounded-full blur-md" />
-      <div className="absolute top-1/3 right-20 w-16 h-16 bg-white/30 rounded-full" />
-      <div className="absolute bottom-10 left-16 w-20 h-20 bg-sky/40 rounded-full blur-sm" />
+            <main>
+                <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-16">
+                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-apricot mb-4">
+                        Guide francophone à Chongqing
+                    </p>
+                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] tracking-tight max-w-3xl">
+                        Découvrir Chongqing
+                        <span className="block text-ink/50">comme on ne la voit pas dans les guides.</span>
+                    </h1>
+                    <p className="mt-6 text-lg sm:text-xl text-ink/70 max-w-2xl leading-relaxed">
+                        Je m’appelle Mattis. J’habite ici, et je construis chaque journée autour
+                        de toi : l’histoire de la ville, la cuisine, les points de vue, et ce
+                        que la Chine est devenue — raconté depuis le terrain.
+                    </p>
+                    <div className="mt-8 flex flex-wrap gap-3">
+                        <Link
+                            href="#demande"
+                            className="bg-ink text-white font-semibold px-6 py-3 rounded-full hover:bg-ink/90 transition"
+                        >
+                            Préparer ma journée
+                        </Link>
+                        <Link
+                            href="#avis"
+                            className="border-2 border-ink/15 font-semibold px-6 py-3 rounded-full hover:border-ink/40 transition"
+                        >
+                            Lire les retours
+                        </Link>
+                    </div>
+                    <p className="mt-6 text-sm font-medium text-ink/50">
+                        Journée type 9h–16h · 85 € par personne · Parcours sur mesure
+                    </p>
+                </section>
 
-      <div className="relative z-10 w-full max-w-2xl bg-white/90 backdrop-blur-sm rounded-3xl px-6 md:px-8 py-8 md:py-10 shadow-2xl border-4 border-white flex flex-col gap-4 md:gap-6">
+                <section
+                    id="savoir-faire"
+                    className="max-w-5xl mx-auto px-4 sm:px-6 pb-20 scroll-mt-20"
+                >
+                    <h2 className="text-2xl sm:text-3xl font-extrabold mb-3">
+                        Mon savoir-faire
+                    </h2>
+                    <p className="text-ink/65 max-w-2xl mb-8 leading-relaxed">
+                        Ce n’est pas un circuit figé. C’est une journée construite avec toi,
+                        adaptée à ton rythme, tes envies, et à ce que Chongqing a de plus
+                        vivant.
+                    </p>
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <Skill
+                            icon={<Map size={22} />}
+                            title="Un parcours adapté"
+                            text="J’ajuste le chemin en fonction de toi : mobilité, chaleur, envies du moment. C’est souvent ce que les gens retiennent."
+                        />
+                        <Skill
+                            icon={<Landmark size={22} />}
+                            title="Histoire & culture"
+                            text="Quartiers, bâtiments anciens, évolution de la Chine : je raconte la ville comme je la vis, pas comme une fiche Wikipedia."
+                        />
+                        <Skill
+                            icon={<Utensils size={22} />}
+                            title="Nourriture & quotidien"
+                            text="Street food, hot pot, adresses locales. Manger fait partie de la visite, pas d’une pause à part."
+                        />
+                        <Skill
+                            icon={<Compass size={22} />}
+                            title="Un regard de l’intérieur"
+                            text="Chongqing est la ville que j’ai choisie. Je transmets un point de vue, un vécu, pas seulement des spots photo."
+                        />
+                        <Skill
+                            icon={<Clock size={22} />}
+                            title="Une vraie journée"
+                            text="En général de 9h à 16h. Assez long pour voir, comprendre, et se faire sa propre idée de la ville."
+                        />
+                        <Skill
+                            icon={<Users size={22} />}
+                            title="À taille humaine"
+                            text="Petits groupes, ton, patience. L’idée n’est pas d’enchaîner les sites, c’est de te faire aimer la ville."
+                        />
+                    </div>
+                </section>
 
-        <span className="inline-flex items-center gap-2 bg-bamboo/20 text-bamboo font-bold px-5 py-2 rounded-full text-sm mx-auto">
-          <Sparkles size={16} /> Une aventure à Chongqing
-        </span>
+                <section
+                    id="avis"
+                    className="bg-white border-y border-ink/10 py-16 sm:py-20"
+                >
+                    <div className="max-w-5xl mx-auto px-4 sm:px-6">
+                        <p className="text-sm font-bold uppercase tracking-[0.2em] text-apricot mb-3">
+                            Retours d’expérience
+                        </p>
+                        <h2 className="text-2xl sm:text-3xl font-extrabold mb-3">
+                            Ce que les gens en disent
+                        </h2>
+                        <p className="text-ink/65 max-w-2xl mb-10">
+                            Des messages reçus après les visites — le plus honnête des
+                            argumentaires.
+                        </p>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {REVIEWS.map((review) => (
+                                <figure
+                                    key={review.quote}
+                                    className="bg-cream rounded-3xl p-6 border border-ink/10"
+                                >
+                                    <Quote
+                                        size={22}
+                                        className="text-apricot mb-3"
+                                        aria-hidden
+                                    />
+                                    <blockquote className="text-[15px] sm:text-base leading-relaxed text-ink">
+                                        {review.quote}
+                                    </blockquote>
+                                    <figcaption className="mt-4 text-sm font-semibold text-ink/45">
+                                        {review.meta}
+                                    </figcaption>
+                                </figure>
+                            ))}
+                        </div>
+                    </div>
+                </section>
 
-        <h1 className="text-3xl md:text-4xl font-extrabold text-ink leading-tight">
-          Viens découvrir
-          <span className="block bg-gradient-to-r from-apricot to-sky bg-clip-text text-transparent">
-            Chongqing avec moi ✨
-          </span>
-        </h1>
+                <section className="max-w-5xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
+                    <h2 className="text-2xl sm:text-3xl font-extrabold mb-8">
+                        Comment ça se passe
+                    </h2>
+                    <ol className="grid sm:grid-cols-3 gap-6">
+                        <li>
+                            <p className="text-apricot font-extrabold text-sm mb-2">01</p>
+                            <h3 className="font-bold text-lg mb-2">Tu me parles de toi</h3>
+                            <p className="text-ink/65 text-sm leading-relaxed">
+                                Dates, rythme, envies, contraintes. Le formulaire prend quelques
+                                minutes.
+                            </p>
+                        </li>
+                        <li>
+                            <p className="text-apricot font-extrabold text-sm mb-2">02</p>
+                            <h3 className="font-bold text-lg mb-2">Je compose la journée</h3>
+                            <p className="text-ink/65 text-sm leading-relaxed">
+                                Un parcours pensé pour votre groupe. Confirmation avec un acompte
+                                de 25 %.
+                            </p>
+                        </li>
+                        <li>
+                            <p className="text-apricot font-extrabold text-sm mb-2">03</p>
+                            <h3 className="font-bold text-lg mb-2">On part de 9h à 16h</h3>
+                            <p className="text-ink/65 text-sm leading-relaxed">
+                                85 € par personne, hors transport, repas et billets. Le solde se
+                                règle au début de la visite.
+                            </p>
+                        </li>
+                    </ol>
+                </section>
 
-        <p className="text-sm md:text-base text-ink/70">
-          J&apos;ai envie de vous faire découvrir ma ville comme je la connais vraiment 😁<br /><br />
-          Ses coins préférés, sa nourriture, ses beaux points de vue et toutes les
-          petites expériences qu&apos;on ne trouve pas forcément dans les guides.
-        </p>
+                <section
+                    id="demande"
+                    className="max-w-2xl mx-auto px-4 sm:px-6 pb-24 scroll-mt-20"
+                >
+                    <h2 className="text-2xl sm:text-3xl font-extrabold mb-2">
+                        Demander un tour
+                    </h2>
+                    <p className="text-ink/65 mb-8">
+                        Dis-moi qui tu es et ce que tu aimerais vivre. Je reviens vers toi
+                        avec une proposition.
+                    </p>
+                    <TourForm />
+                </section>
+            </main>
 
-        <p className="text-sm md:text-base text-ink/70">
-          Si tu aimerais participer à un tour guidé avec moi à Chongqing,
-          remplis ce petit formulaire pour me parler de ton projet 💛
-        </p>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3">
-          <div className="bg-bamboo/10 p-3 rounded-2xl hover:scale-105 transition flex flex-col items-center justify-center min-h-[85px]">
-            <Mountain className="w-6 h-6 text-bamboo mb-2" />
-            <span className="text-xs font-semibold text-ink text-center line-clamp-2">
-              Vues de folie
-            </span>
-          </div>
-
-          <div className="bg-sky/10 p-3 rounded-2xl hover:scale-105 transition flex flex-col items-center justify-center min-h-[85px]">
-            <Building2 className="w-6 h-6 text-sky mb-2" />
-            <span className="text-xs font-semibold text-ink text-center line-clamp-2">
-              Comme un local
-            </span>
-          </div>
-
-          <div className="bg-apricot/10 p-3 rounded-2xl hover:scale-105 transition flex flex-col items-center justify-center min-h-[85px]">
-            <Landmark className="w-6 h-6 text-apricot mb-2" />
-            <span className="text-xs font-semibold text-ink text-center line-clamp-2">
-              Culture locale
-            </span>
-          </div>
-
-          <div className="bg-sunshine/10 p-3 rounded-2xl hover:scale-105 transition flex flex-col items-center justify-center min-h-[85px]">
-            <Utensils className="w-6 h-6 text-sunshine mb-2" />
-            <span className="text-xs font-semibold text-ink text-center line-clamp-2">
-              Food trip
-            </span>
-          </div>
+            <footer className="border-t border-ink/10 py-8 text-center text-sm text-ink/45">
+                Mattis · Guide à Chongqing
+            </footer>
         </div>
+    )
+}
 
-        <Link
-          href="/formulaire"
-          className="inline-block bg-gradient-to-r from-apricot to-sunshine hover:scale-105 text-white font-bold px-8 py-3 md:py-4 rounded-full shadow-lg transition-transform text-base md:text-lg mx-auto"
-        >
-          Découvrir Chongqing 🚀
-        </Link>
-
-        <p className="text-xs md:text-sm text-ink/60">
-          Quelques questions pour en savoir plus sur toi et ton voyage.
-        </p>
-
-        <p className="relative z-10 text-sunshine mt-8 text-sm font-medium">
-          ⏱️ Ça  prend seulement quelques minutes 💌
-        </p>
-      </div>
-    </main>
-  )
+function Skill({
+    icon,
+    title,
+    text,
+}: {
+    icon: ReactNode;
+    title: string
+    text: string
+}) {
+    return (
+        <article className="bg-white rounded-3xl p-5 border border-ink/10">
+            <div className="w-10 h-10 rounded-2xl bg-apricot/15 text-apricot flex items-center justify-center mb-4">
+                {icon}
+            </div>
+            <h3 className="font-bold text-lg mb-2">{title}</h3>
+            <p className="text-sm text-ink/65 leading-relaxed">{text}</p>
+        </article>
+    )
 }

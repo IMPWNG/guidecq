@@ -1,9 +1,16 @@
 import type { Metadata, Viewport } from 'next'
+import { Poppins } from 'next/font/google'
 import './globals.css'
 
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800'],
+})
+
 export const metadata: Metadata = {
-  title: 'Chongqing Tours - Créons votre voyage sur mesure',
-  description: 'Planifiez votre séjour à Chongqing selon vos envies',
+  title: 'Mattis · Guide à Chongqing',
+  description:
+    'Journées guidées sur mesure à Chongqing : histoire, culture, nourriture et regard local. 9h–16h, 85 € par personne.',
 }
 
 export const viewport: Viewport = {
@@ -18,8 +25,8 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="fr">
-      <body className="bg-cream text-ink font-sans min-h-screen">
+    <html lang="fr" className="scroll-smooth">
+      <body className={`${poppins.className} bg-cream text-ink min-h-screen`}>
         {children}
       </body>
     </html>
