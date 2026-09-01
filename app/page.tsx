@@ -12,7 +12,7 @@ import {
 import PublicHeader from '@/components/PublicHeader'
 import TourForm from '@/components/TourForm'
 
-const REVIEWS = [
+const REVIEWS: { name: string; quote: string; theme?: string }[] = [
     {
         name: 'Quentin',
         quote: `Mec, c’était incroyable de découvrir Chongqing comme tu me l’as fait découvrir. Pour une première fois ici et pour un premier jour, je pouvais difficilement espérer mieux !
@@ -55,6 +55,13 @@ Tu m as fait découvrir des spots géniaux. Je n'hésiterai pas à transmettre t
     {
         name: 'Matheo',
         quote: `Merci encore pour la visite, très content d’avoir pu découvrir un chongqing que je n’imaginais pas ! C’est pile dans l’esprit que je voulais pour mon voyage ! Mention spéciale au resto du midi qui a participé à rendre la visite inoubliable !`,
+    },
+    {
+        name: 'Léa',
+        theme: 'Tour street photography',
+        quote: `Hello Mat,
+Encore merci pour hier. C’était vraiment une super journée, exactement ce que je cherchais. J’ai adoré découvrir tous ces quartiers et ces beaux points de vue où je ne serais pas allée seule. J’ai aussi beaucoup aimé pouvoir prendre mon temps et explorer à mon rythme. Et tes connaissances sur l’histoire et la culture chinoises ont vraiment rendu la journée encore plus intéressante. C’était un super équilibre entre photo, découverte et discussions 😊
+Merci encore ! À +`,
     },
 ]
 
@@ -174,6 +181,12 @@ export default function Home() {
                                     </blockquote>
                                     <figcaption className="mt-4 text-sm font-semibold text-ink/45">
                                         {review.name}
+                                        {review.theme ? (
+                                            <span className="font-medium text-ink/35">
+                                                {' '}
+                                                · {review.theme}
+                                            </span>
+                                        ) : null}
                                     </figcaption>
                                 </figure>
                             ))}
