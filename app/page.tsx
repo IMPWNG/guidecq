@@ -44,6 +44,7 @@ Merci encore pour ton temps, tes conseils et ta bonne humeur. Je garderai un tr�
     },
     {
         name: 'Soiz',
+        theme: 'Tour en famille',
         quote: `Merci Mattis pour cette journée où culture, histoire, économie, nourriture sont alimentés par tes connaissances du monde, de la Chine et de Chongching (la ville que tu as choisie). Ton adaptation de parcours a été Top.`,
     },
     {
@@ -62,6 +63,11 @@ Tu m as fait découvrir des spots géniaux. Je n'hésiterai pas à transmettre t
         quote: `Hello Mat,
 Encore merci pour hier. C’était vraiment une super journée, exactement ce que je cherchais. J’ai adoré découvrir tous ces quartiers et ces beaux points de vue où je ne serais pas allée seule. J’ai aussi beaucoup aimé pouvoir prendre mon temps et explorer à mon rythme. Et tes connaissances sur l’histoire et la culture chinoises ont vraiment rendu la journée encore plus intéressante. C’était un super équilibre entre photo, découverte et discussions 😊
 Merci encore ! À +`,
+    },
+    {
+        name: 'Vanessa',
+        theme: 'Tour en famille',
+        quote: `Encore merci pour cette journée de découvertes. Cela nous a permis de visiter la ville sous un angle différent. Ta connaissance des lieux fait que nous sommes passés par des endroits que nous n'aurions pas visités ou même trouvés. Apprendre l'histoire de Chongqing est également très intéressant . Un réel plaisir pour toute la famille. On pensera à toi si on repasse dans la région.`,
     },
 ]
 
