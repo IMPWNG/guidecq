@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import {
@@ -40,34 +41,60 @@ export default async function Home({
 
             <main>
                 <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-16">
-                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-apricot mb-4">
-                        {dict.home.eyebrow}
-                    </p>
-                    <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] tracking-tight max-w-3xl">
-                        {dict.home.title}
-                        <span className="block text-ink/50">{dict.home.titleAccent}</span>
-                    </h1>
-                    <p className="mt-6 text-lg sm:text-xl text-ink/70 max-w-2xl leading-relaxed">
-                        {dict.home.intro}
-                        <br />
-                        <br />
-                        {dict.home.intro2}
-                    </p>
-                    <div className="mt-8 flex flex-wrap gap-3">
-                        <Link
-                            href="#demande"
-                            className="bg-ink text-white font-semibold px-6 py-3 rounded-full hover:bg-ink/90 transition"
+                    <div className="grid lg:grid-cols-[minmax(0,1fr)_min(280px,32%)] gap-10 lg:gap-12 items-center">
+                        <div>
+                            <p className="text-sm font-bold uppercase tracking-[0.2em] text-apricot mb-4">
+                                {dict.home.eyebrow}
+                            </p>
+                            <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold leading-[1.1] tracking-tight max-w-3xl">
+                                {dict.home.title}
+                                <span className="block text-ink/50">{dict.home.titleAccent}</span>
+                            </h1>
+                            <p className="mt-6 text-lg sm:text-xl text-ink/70 max-w-2xl leading-relaxed">
+                                {dict.home.intro}
+                                <br />
+                                <br />
+                                {dict.home.intro2}
+                            </p>
+                            <div className="mt-8 flex flex-wrap gap-3">
+                                <Link
+                                    href="#demande"
+                                    className="bg-ink text-white font-semibold px-6 py-3 rounded-full hover:bg-ink/90 transition"
+                                >
+                                    {dict.home.ctaPrimary}
+                                </Link>
+                                <Link
+                                    href="#avis"
+                                    className="border-2 border-ink/15 font-semibold px-6 py-3 rounded-full hover:border-ink/40 transition"
+                                >
+                                    {dict.home.ctaSecondary}
+                                </Link>
+                            </div>
+                            <p className="mt-6 text-sm font-medium text-ink/50">{dict.home.metaLine}</p>
+                        </div>
+
+                        <a
+                            href="https://www.instagram.com/chongqingbarbermat/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={dict.home.instagramAria}
+                            className="mx-auto lg:mx-0 justify-self-center lg:justify-self-end w-full max-w-50 sm:max-w-60 lg:max-w-65 group"
                         >
-                            {dict.home.ctaPrimary}
-                        </Link>
-                        <Link
-                            href="#avis"
-                            className="border-2 border-ink/15 font-semibold px-6 py-3 rounded-full hover:border-ink/40 transition"
-                        >
-                            {dict.home.ctaSecondary}
-                        </Link>
+                            <span className="block rounded-3xl overflow-hidden bg-white shadow-[0_18px_40px_-18px_rgba(58,58,58,0.45)] transition group-hover:shadow-[0_22px_48px_-16px_rgba(58,58,58,0.5)] group-hover:-translate-y-0.5">
+                                <Image
+                                    src="/instagram-qr.png"
+                                    alt="@chongqingbarbermat"
+                                    width={453}
+                                    height={453}
+                                    className="w-full h-auto"
+                                    priority
+                                />
+                            </span>
+                            <span className="mt-3 block text-center text-sm font-semibold text-ink/55 group-hover:text-ink">
+                                {dict.home.instagramHint}
+                            </span>
+                        </a>
                     </div>
-                    <p className="mt-6 text-sm font-medium text-ink/50">{dict.home.metaLine}</p>
                 </section>
 
                 <section

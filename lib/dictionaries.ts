@@ -46,6 +46,8 @@ const fr = {
         ctaPrimary: 'Préparer ma journée',
         ctaSecondary: 'Lire les retours',
         metaLine: 'Journée type 9h–16h · 85 € par personne · Parcours sur mesure',
+        instagramHint: 'Scanne pour me suivre',
+        instagramAria: 'Ouvrir Instagram @chongqingbarbermat',
         skillsTitle: 'Mon savoir-faire',
         skillsIntro:
             'Ce n’est pas un circuit figé. C’est une journée construite avec toi, adaptée à ton rythme, tes envies, et à ce que Chongqing a de plus vivant.',
@@ -439,6 +441,8 @@ const en = {
         ctaPrimary: 'Plan my day',
         ctaSecondary: 'Read the reviews',
         metaLine: 'Typical day 9am–4pm · €85 per person · Custom route',
+        instagramHint: 'Scan to follow me',
+        instagramAria: 'Open Instagram @chongqingbarbermat',
         skillsTitle: 'How I guide',
         skillsIntro:
             'This is not a fixed loop. It is a day built with you — your pace, your interests, and what Chongqing does best.',
