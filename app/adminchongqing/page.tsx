@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
 import {
+    BookOpen,
     CalendarDays,
     CheckCircle2,
     ChevronDown,
@@ -385,8 +386,133 @@ const PHASE_ORDER: Record<TourPhase, number> = {
     cancelled: 3,
 };
 
+const GUIDE_WAITLIST_MARKER = /Liste d['’]attente guides|Commande guide PDF/i;
+
+const GUIDE_LABELS: Record<string, string> = {
+    classic: 'Journée classique',
+    photo: 'Guide photo',
+    gourmet: 'Guide gourmand',
+};
+
+type GuideWaitlistEntry = {
+    id: string;
+    source: 'guide_orders' | 'tour_requests';
+    prenom: string;
+    nom: string;
+    email: string;
+    telephone: string;
+    guides: string[];
+    message: string;
+    locale: string;
+    created_at: string;
+};
+
+type GuidePurchaseRow = {
+    id: string;
+    prenom: string;
+    nom: string;
+    email: string;
+    telephone: string;
+    guides: string[] | null;
+    amount_eur: number | string;
+    status: string;
+    access_token: string;
+    payment_reference: string;
+    locale: string;
+    created_at: string;
+    paid_at: string | null;
+    message: string | null;
+};
+
+function isGuideWaitlistRequest(request: TourRequest) {
+    return GUIDE_WAITLIST_MARKER.test(request.commentaires || '');
+}
+
+function normalizeGuides(raw: unknown): string[] {
+    if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+    if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+        } catch {
+            return trimmed
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean);
+        }
+    }
+    return [];
+}
+
+function parseWaitlistComment(commentaires: string) {
+    const lines = commentaires
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+    const guides: string[] = [];
+    let locale = '';
+    const messageLines: string[] = [];
+
+    for (const line of lines) {
+        if (GUIDE_WAITLIST_MARKER.test(line) && !line.includes(':')) continue;
+        const guidesMatch = line.match(/^Guides:\s*(.+)$/i);
+        if (guidesMatch) {
+            guides.push(...normalizeGuides(guidesMatch[1]));
+            continue;
+        }
+        const localeMatch = line.match(/^Locale:\s*(.+)$/i);
+        if (localeMatch) {
+            locale = localeMatch[1].trim();
+            continue;
+        }
+        messageLines.push(line);
+    }
+
+    return { guides, locale, message: messageLines.join('\n') };
+}
+
+function guideLabel(id: string) {
+    return GUIDE_LABELS[id] || id;
+}
+
+function waitlistFromTourRequest(request: TourRequest): GuideWaitlistEntry {
+    const parsed = parseWaitlistComment(request.commentaires || '');
+    return {
+        id: request.id,
+        source: 'tour_requests',
+        prenom: request.prenom,
+        nom: request.nom,
+        email: request.email,
+        telephone: request.telephone,
+        guides: parsed.guides,
+        message: parsed.message,
+        locale: parsed.locale,
+        created_at: request.created_at,
+    };
+}
+
+function waitlistFromOrder(row: Record<string, unknown>): GuideWaitlistEntry {
+    return {
+        id: String(row.id ?? ''),
+        source: 'guide_orders',
+        prenom: String(row.prenom ?? ''),
+        nom: String(row.nom ?? ''),
+        email: String(row.email ?? ''),
+        telephone: String(row.telephone ?? ''),
+        guides: normalizeGuides(row.guides),
+        message: String(row.message ?? ''),
+        locale: String(row.locale ?? ''),
+        created_at: String(row.created_at ?? ''),
+    };
+}
+
 export default function AdminChongqing() {
     const [requests, setRequests] = useState<TourRequest[]>([]);
+    const [guideOrders, setGuideOrders] = useState<GuideWaitlistEntry[]>([]);
+    const [guidePurchases, setGuidePurchases] = useState<GuidePurchaseRow[]>([]);
+    const [purchasesError, setPurchasesError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -399,14 +525,42 @@ export default function AdminChongqing() {
             .select('*')
             .order('created_at', { ascending: false });
 
+        const tours = data || [];
+        const waitlistFromTours = tours.filter(isGuideWaitlistRequest);
+
         if (fetchError) {
             setError(`Erreur: ${fetchError.message}`);
             setRequests([]);
-            return;
+        } else {
+            setRequests(tours.filter((request) => !isGuideWaitlistRequest(request)));
+            setError(null);
         }
 
-        setRequests(data || []);
-        setError(null);
+        const { data: orders } = await supabase
+            .from('guide_orders')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        const fromOrders = (orders || []).map((row) =>
+            waitlistFromOrder(row as Record<string, unknown>)
+        );
+        const merged = [...fromOrders, ...waitlistFromTours.map(waitlistFromTourRequest)].sort(
+            (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setGuideOrders(merged);
+
+        const { data: purchases, error: purchasesFetchError } = await supabase
+            .from('guide_purchases')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (purchasesFetchError) {
+            setPurchasesError(purchasesFetchError.message);
+            setGuidePurchases([]);
+        } else {
+            setPurchasesError(null);
+            setGuidePurchases((purchases || []) as GuidePurchaseRow[]);
+        }
     };
 
     useEffect(() => {
@@ -495,6 +649,58 @@ export default function AdminChongqing() {
         }
 
         setRequests((prev) => prev.filter((r) => r.id !== id));
+        setGuideOrders((prev) => prev.filter((entry) => entry.id !== id));
+    };
+
+    const deleteGuideOrder = async (entry: GuideWaitlistEntry) => {
+        if (!confirm('Sûr de vouloir supprimer cette inscription guide ?')) return;
+
+        const table = entry.source === 'guide_orders' ? 'guide_orders' : 'tour_requests';
+        const { error: deleteError } = await supabase.from(table).delete().eq('id', entry.id);
+
+        if (deleteError) {
+            alert('Erreur: ' + deleteError.message);
+            return;
+        }
+
+        setGuideOrders((prev) => prev.filter((item) => item.id !== entry.id));
+    };
+
+    const markGuidePurchasePaid = async (id: string) => {
+        const { error: updateError } = await supabase
+            .from('guide_purchases')
+            .update({ status: 'paid', paid_at: new Date().toISOString() })
+            .eq('id', id);
+
+        if (updateError) {
+            alert(
+                'Erreur: ' +
+                    updateError.message +
+                    '\n\nSi la table n’existe pas, exécute supabase/guide_purchases.sql dans Supabase.'
+            );
+            return;
+        }
+
+        setGuidePurchases((prev) =>
+            prev.map((row) =>
+                row.id === id
+                    ? { ...row, status: 'paid', paid_at: new Date().toISOString() }
+                    : row
+            )
+        );
+    };
+
+    const deleteGuidePurchase = async (id: string) => {
+        if (!confirm('Sûr de vouloir supprimer cet achat guide ?')) return;
+        const { error: deleteError } = await supabase
+            .from('guide_purchases')
+            .delete()
+            .eq('id', id);
+        if (deleteError) {
+            alert('Erreur: ' + deleteError.message);
+            return;
+        }
+        setGuidePurchases((prev) => prev.filter((row) => row.id !== id));
     };
 
     const enriched = useMemo(() => {
@@ -548,7 +754,6 @@ export default function AdminChongqing() {
         const projectionHypothetical = sumTotal(hypothetical);
 
         return {
-            reservations: active.length,
             peopleToConfirm: sumPeople(toConfirm),
             toursToConfirm: toConfirm.length,
             peopleUpcoming: sumPeople(upcoming),
@@ -720,14 +925,9 @@ export default function AdminChongqing() {
         <div className="min-h-screen bg-cream p-4 sm:p-8">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-8">
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-ink mb-2">
+                    <h1 className="text-3xl sm:text-4xl font-extrabold text-ink">
                         Admin Chongqing
                     </h1>
-                    <p className="text-ink/80 text-base sm:text-lg font-medium">
-                        {stats.reservations} réservation{stats.reservations > 1 ? 's' : ''} active
-                        {stats.reservations > 1 ? 's' : ''} · {UNIT_PRICE} € / personne · acompte{' '}
-                        {DEPOSIT_RATE * 100} %
-                    </p>
                 </div>
 
                 {error && (
@@ -736,28 +936,41 @@ export default function AdminChongqing() {
                     </div>
                 )}
 
+                <GuidePurchasesPanel
+                    entries={guidePurchases}
+                    error={purchasesError}
+                    onMarkPaid={markGuidePurchasePaid}
+                    onDelete={deleteGuidePurchase}
+                />
+
+                <GuideWaitlistPanel entries={guideOrders} onDelete={deleteGuideOrder} />
+
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
                     <StatCard
                         label="À confirmer"
                         value={stats.peopleToConfirm}
+                        unit="personnes"
                         hint={`${stats.toursToConfirm} dossier${stats.toursToConfirm > 1 ? 's' : ''} sans confirmation`}
                         tone="amber"
                     />
                     <StatCard
                         label="Personnes à venir"
                         value={stats.peopleUpcoming}
+                        unit="personnes"
                         hint={`${stats.toursUpcoming} tour${stats.toursUpcoming > 1 ? 's' : ''} confirmé${stats.toursUpcoming > 1 ? 's' : ''}`}
                         tone="sky"
                     />
                     <StatCard
                         label="En visite maintenant"
                         value={stats.peopleOngoing}
+                        unit="personnes"
                         hint={`${stats.toursOngoing} tour${stats.toursOngoing > 1 ? 's' : ''}`}
                         tone="green"
                     />
                     <StatCard
                         label="Visites déjà faites"
                         value={stats.peopleFinished}
+                        unit="personnes"
                         hint={`${stats.toursFinished} tour${stats.toursFinished > 1 ? 's' : ''} fini${stats.toursFinished > 1 ? 's' : ''}`}
                         tone="slate"
                     />
@@ -1478,14 +1691,307 @@ function VisitCalendar({
     );
 }
 
+function formatWaitlistDate(value: string) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleString('fr-FR', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function GuidePurchasesPanel({
+    entries,
+    error,
+    onMarkPaid,
+    onDelete,
+}: {
+    entries: GuidePurchaseRow[];
+    error: string | null;
+    onMarkPaid: (id: string) => void;
+    onDelete: (id: string) => void;
+}) {
+    const [open, setOpen] = useState(true);
+    const pending = entries.filter((row) => row.status === 'pending').length;
+    const paid = entries.filter((row) => row.status === 'paid').length;
+
+    return (
+        <section className="mb-8 bg-white rounded-2xl border border-ink/10 shadow-sm overflow-hidden">
+            <button
+                type="button"
+                onClick={() => setOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-sunshine/10 transition-colors"
+            >
+                <span className="flex items-center gap-3 min-w-0">
+                    <span className="w-10 h-10 rounded-xl bg-apricot/15 text-apricot flex items-center justify-center shrink-0">
+                        <Wallet size={20} />
+                    </span>
+                    <span>
+                        <span className="block font-extrabold text-ink">Achats guides (Wise)</span>
+                        <span className="block text-sm font-medium text-ink/65">
+                            {error
+                                ? 'Table à créer dans Supabase'
+                                : entries.length === 0
+                                  ? 'Aucun achat pour l’instant'
+                                  : `${paid} payé${paid > 1 ? 's' : ''} · ${pending} en attente`}
+                        </span>
+                    </span>
+                </span>
+                <ChevronDown
+                    size={22}
+                    className={`text-apricot shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                />
+            </button>
+
+            {open && (
+                <div className="border-t border-ink/10">
+                    {error ? (
+                        <p className="px-5 py-6 text-sm text-ink/70 leading-relaxed">
+                            {error}
+                            <br />
+                            Colle le fichier <code>supabase/guide_purchases.sql</code> dans
+                            Supabase → SQL Editor.
+                        </p>
+                    ) : entries.length === 0 ? (
+                        <p className="px-5 py-6 text-sm text-ink/60">
+                            Les paiements Wise apparaîtront ici.
+                        </p>
+                    ) : (
+                        <ul className="divide-y divide-ink/10">
+                            {entries.map((entry) => {
+                                const locale = entry.locale === 'en' ? 'en' : 'fr';
+                                const memberPath = `/${locale}/membre/${entry.access_token}`;
+                                const isPaid = entry.status === 'paid';
+                                return (
+                                    <li key={entry.id} className="px-5 py-4">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="font-extrabold text-ink">
+                                                    {entry.prenom} {entry.nom}
+                                                </p>
+                                                <p className="text-sm text-ink/55 mt-0.5">
+                                                    {formatWaitlistDate(entry.created_at)}
+                                                    {` · ${Number(entry.amount_eur).toFixed(2)} €`}
+                                                    {` · ${entry.payment_reference}`}
+                                                </p>
+                                            </div>
+                                            <span
+                                                className={`text-xs font-bold uppercase tracking-wide px-2.5 py-1 rounded-full shrink-0 ${
+                                                    isPaid
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-amber-100 text-amber-800'
+                                                }`}
+                                            >
+                                                {isPaid ? 'Payé' : 'En attente'}
+                                            </span>
+                                        </div>
+
+                                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                                            {entry.email ? (
+                                                <a
+                                                    href={`mailto:${entry.email}`}
+                                                    className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-apricot"
+                                                >
+                                                    <Mail size={14} />
+                                                    {entry.email}
+                                                </a>
+                                            ) : null}
+                                            {entry.telephone ? (
+                                                <a
+                                                    href={`tel:${entry.telephone}`}
+                                                    className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-apricot"
+                                                >
+                                                    <Phone size={14} />
+                                                    {entry.telephone}
+                                                </a>
+                                            ) : null}
+                                        </div>
+
+                                        {normalizeGuides(entry.guides).length > 0 ? (
+                                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                                {normalizeGuides(entry.guides).map((guide) => (
+                                                    <span
+                                                        key={guide}
+                                                        className="px-2.5 py-1 rounded-full bg-apricot/15 text-apricot text-xs font-bold"
+                                                    >
+                                                        {guideLabel(guide)}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : null}
+
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                            {isPaid ? (
+                                                <a
+                                                    href={memberPath}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="text-sm font-semibold text-apricot hover:text-apricot/80"
+                                                >
+                                                    Ouvrir l’espace membre
+                                                </a>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => onMarkPaid(entry.id)}
+                                                    className="text-sm font-semibold bg-ink text-white px-3 py-1.5 rounded-lg hover:bg-ink/90"
+                                                >
+                                                    Marquer payé
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                onClick={() => onDelete(entry.id)}
+                                                className="p-2 hover:bg-red-100 rounded-lg text-red-600"
+                                                title="Supprimer"
+                                            >
+                                                <Trash2 size={18} />
+                                            </button>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </div>
+            )}
+        </section>
+    );
+}
+
+function GuideWaitlistPanel({
+    entries,
+    onDelete,
+}: {
+    entries: GuideWaitlistEntry[];
+    onDelete: (entry: GuideWaitlistEntry) => void;
+}) {
+    const [open, setOpen] = useState(true);
+
+    return (
+        <section className="mb-8 bg-white rounded-2xl border border-ink/10 shadow-sm overflow-hidden">
+            <button
+                type="button"
+                onClick={() => setOpen((prev) => !prev)}
+                className="w-full flex items-center justify-between gap-3 px-5 py-4 text-left hover:bg-sunshine/10 transition-colors"
+            >
+                <span className="flex items-center gap-3 min-w-0">
+                    <span className="w-10 h-10 rounded-xl bg-apricot/15 text-apricot flex items-center justify-center shrink-0">
+                        <BookOpen size={20} />
+                    </span>
+                    <span>
+                        <span className="block font-extrabold text-ink">Liste d’attente guides</span>
+                        <span className="block text-sm font-medium text-ink/65">
+                            {entries.length === 0
+                                ? 'Aucune inscription pour l’instant'
+                                : `${entries.length} inscription${entries.length > 1 ? 's' : ''} · messages et coordonnées`}
+                        </span>
+                    </span>
+                </span>
+                <ChevronDown
+                    size={22}
+                    className={`text-apricot shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+                />
+            </button>
+
+            {open && (
+                <div className="border-t border-ink/10">
+                    {entries.length === 0 ? (
+                        <p className="px-5 py-6 text-sm text-ink/60">
+                            Les inscriptions du formulaire guides apparaîtront ici.
+                        </p>
+                    ) : (
+                        <ul className="divide-y divide-ink/10">
+                            {entries.map((entry) => (
+                                <li key={`${entry.source}-${entry.id}`} className="px-5 py-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="font-extrabold text-ink">
+                                                {entry.prenom} {entry.nom}
+                                            </p>
+                                            <p className="text-sm text-ink/55 mt-0.5">
+                                                {formatWaitlistDate(entry.created_at)}
+                                                {entry.locale
+                                                    ? ` · ${entry.locale.toUpperCase()}`
+                                                    : ''}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => onDelete(entry)}
+                                            className="p-2 hover:bg-red-100 rounded-lg text-red-600 shrink-0"
+                                            title="Supprimer"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+
+                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                                        {entry.email ? (
+                                            <a
+                                                href={`mailto:${entry.email}`}
+                                                className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-apricot"
+                                            >
+                                                <Mail size={14} />
+                                                {entry.email}
+                                            </a>
+                                        ) : null}
+                                        {entry.telephone && entry.telephone !== '—' ? (
+                                            <a
+                                                href={`tel:${entry.telephone}`}
+                                                className="inline-flex items-center gap-1.5 font-medium text-ink hover:text-apricot"
+                                            >
+                                                <Phone size={14} />
+                                                {entry.telephone}
+                                            </a>
+                                        ) : null}
+                                    </div>
+
+                                    {entry.guides.length > 0 ? (
+                                        <div className="mt-2 flex flex-wrap gap-1.5">
+                                            {entry.guides.map((guide) => (
+                                                <span
+                                                    key={guide}
+                                                    className="px-2.5 py-1 rounded-full bg-apricot/15 text-apricot text-xs font-bold"
+                                                >
+                                                    {guideLabel(guide)}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    ) : null}
+
+                                    {entry.message ? (
+                                        <p className="mt-3 text-sm leading-relaxed text-ink/80 bg-cream rounded-xl px-3 py-2 whitespace-pre-wrap">
+                                            {entry.message}
+                                        </p>
+                                    ) : (
+                                        <p className="mt-3 text-sm italic text-ink/45">
+                                            Aucun message laissé
+                                        </p>
+                                    )}
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                </div>
+            )}
+        </section>
+    );
+}
+
 function StatCard({
     label,
     value,
+    unit,
     hint,
     tone,
 }: {
     label: string;
     value: string | number;
+    unit?: string;
     hint: string;
     tone: 'sky' | 'green' | 'slate' | 'orange' | 'amber';
 }) {
@@ -1502,7 +2008,14 @@ function StatCard({
             <p className="text-xs sm:text-sm font-bold uppercase tracking-wide text-ink/70 mb-1">
                 {label}
             </p>
-            <p className="text-3xl sm:text-4xl font-extrabold leading-tight">{value}</p>
+            <p className="text-3xl sm:text-4xl font-extrabold leading-tight">
+                {value}
+                {unit ? (
+                    <span className="ml-1.5 text-base sm:text-lg font-bold text-ink/45">
+                        /{unit}
+                    </span>
+                ) : null}
+            </p>
             <p className="text-sm font-medium text-ink/70 mt-1 leading-snug">{hint}</p>
         </div>
     );
