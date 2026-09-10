@@ -58,16 +58,22 @@ interface TourRequest {
     jours_visite?: string[] | string | null;
 }
 
-type StatusType =
-    | 'nouveau'
-    | 'en_cours'
-    | 'email_envoye'
-    | 'confirme'
-    | 'termine'
-    | 'annule';
+const STATUS_VALUES = [
+    'nouveau',
+    'en_cours',
+    'email_envoye',
+    'confirme',
+    'tour_en_cours',
+    'termine',
+    'annule',
+] as const;
 
+type StatusType = (typeof STATUS_VALUES)[number];
 type TourPhase = 'upcoming' | 'ongoing' | 'finished' | 'cancelled';
-type FilterType = 'tous' | 'a_confirmer' | 'a_venir' | 'en_visite' | 'termines' | 'annules';
+type FilterType = 'tous' | StatusType;
+
+const STATUS_CHECK_SQL =
+    "ALTER TABLE tour_requests DROP CONSTRAINT IF EXISTS tour_requests_status_check;\nALTER TABLE tour_requests ALTER COLUMN status SET DEFAULT 'nouveau';\nALTER TABLE tour_requests ADD CONSTRAINT tour_requests_status_check CHECK (status IN ('nouveau', 'en_cours', 'email_envoye', 'confirme', 'tour_en_cours', 'termine', 'annule'));";
 
 const STATUS_CONFIG: Record<
     StatusType,
@@ -80,7 +86,7 @@ const STATUS_CONFIG: Record<
         border: 'border-blue-500',
     },
     en_cours: {
-        label: 'En cours',
+        label: 'En cours de validation',
         color: 'text-amber-800',
         bgColor: 'bg-amber-100',
         border: 'border-amber-500',
@@ -97,6 +103,12 @@ const STATUS_CONFIG: Record<
         bgColor: 'bg-green-100',
         border: 'border-green-500',
     },
+    tour_en_cours: {
+        label: 'Tour en cours',
+        color: 'text-orange-900',
+        bgColor: 'bg-orange-100',
+        border: 'border-orange-500',
+    },
     termine: {
         label: 'Tour fini',
         color: 'text-slate-800',
@@ -109,6 +121,16 @@ const STATUS_CONFIG: Record<
         bgColor: 'bg-red-100',
         border: 'border-red-500',
     },
+};
+
+const STATUS_ORDER: Record<StatusType, number> = {
+    nouveau: 0,
+    en_cours: 1,
+    email_envoye: 2,
+    confirme: 3,
+    tour_en_cours: 4,
+    termine: 5,
+    annule: 6,
 };
 
 function normalizeName(value: string | undefined | null): string {
@@ -185,19 +207,25 @@ function getHeadcount(request: TourRequest) {
     };
 }
 
-function getPricing(peopleCount: number) {
-    const total = peopleCount * UNIT_PRICE;
+function billedVisitDays(visitDayCount: number) {
+    return Math.max(visitDayCount, 1);
+}
+
+function getPricing(peopleCount: number, visitDayCount = 1) {
+    const days = billedVisitDays(visitDayCount);
+    const total = peopleCount * UNIT_PRICE * days;
     const deposit = Math.round(total * DEPOSIT_RATE * 100) / 100;
     const remaining = Math.round((total - deposit) * 100) / 100;
-    return { total, deposit, remaining };
+    return { total, deposit, remaining, days };
 }
 
 function getPaymentState(
     request: TourRequest,
-    pricing: { total: number; deposit: number; remaining: number },
-    phase: TourPhase
+    pricing: { total: number; deposit: number; remaining: number }
 ) {
-    if (request.status === 'annule' || phase === 'cancelled') {
+    const status = normalizeStatus(request.status);
+
+    if (status === 'annule') {
         return {
             collected: 0,
             outstanding: 0,
@@ -205,7 +233,7 @@ function getPaymentState(
         };
     }
 
-    if (request.status === 'termine' || (request.status === 'confirme' && phase === 'finished')) {
+    if (status === 'termine') {
         return {
             collected: pricing.total,
             outstanding: 0,
@@ -213,11 +241,14 @@ function getPaymentState(
         };
     }
 
-    if (request.status === 'confirme') {
+    if (status === 'confirme' || status === 'tour_en_cours') {
         return {
             collected: pricing.deposit,
             outstanding: pricing.remaining,
-            note: 'Confirmé — acompte 25 % reçu, solde à percevoir',
+            note:
+                status === 'tour_en_cours'
+                    ? 'Tour en cours — acompte 25 % reçu, solde à percevoir'
+                    : 'Confirmé — acompte 25 % reçu, solde à percevoir',
         };
     }
 
@@ -252,6 +283,39 @@ function toIsoDate(value: unknown): string | null {
     if (!value || typeof value !== 'string') return null;
     const iso = value.split('T')[0].trim();
     return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : null;
+}
+
+function toIsoFromParts(year: number, monthIndex: number, day: number) {
+    return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function shiftIsoDate(value: string, days: number): string | null {
+    const date = parseLocalDate(value);
+    if (!date) return null;
+    date.setDate(date.getDate() + days);
+    return toIsoFromParts(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function isWithinStay(day: string, arrivee?: string, depart?: string) {
+    const min = toIsoDate(arrivee);
+    const max = toIsoDate(depart);
+    if (min && day < min) return false;
+    if (max && day > max) return false;
+    return true;
+}
+
+function nextExtraVisitDay(days: string[], arrivee?: string, depart?: string): string | null {
+    const sorted = [...days].sort();
+    if (sorted.length === 0) {
+        return toIsoDate(arrivee) || toIsoDate(depart);
+    }
+
+    let candidate = shiftIsoDate(sorted[sorted.length - 1], 1);
+    const existing = new Set(days);
+    while (candidate && existing.has(candidate)) {
+        candidate = shiftIsoDate(candidate, 1);
+    }
+    return candidate;
 }
 
 function getVisitDays(request: Pick<TourRequest, 'jours_visite'>): string[] {
@@ -308,16 +372,22 @@ function stayDuration(arrivee: string, depart: string) {
     return days > 0 ? days : 1;
 }
 
-function getStatusConfig(status: string | undefined) {
+function getStatusConfig(status: string | undefined | null) {
+    return STATUS_CONFIG[normalizeStatus(status)];
+}
+
+function normalizeStatus(status: string | undefined | null): StatusType {
     if (status && status in STATUS_CONFIG) {
-        return STATUS_CONFIG[status as StatusType];
+        return status as StatusType;
     }
-    return STATUS_CONFIG.nouveau;
+    return 'nouveau';
 }
 
 function getTourPhase(request: TourRequest): TourPhase {
-    if (request.status === 'annule') return 'cancelled';
-    if (request.status === 'termine') return 'finished';
+    const status = normalizeStatus(request.status);
+    if (status === 'annule') return 'cancelled';
+    if (status === 'termine') return 'finished';
+    if (status === 'tour_en_cours') return 'ongoing';
 
     const today = startOfDay(new Date());
     const visitDays = getVisitDays(request)
@@ -343,47 +413,11 @@ function getTourPhase(request: TourRequest): TourPhase {
     return 'ongoing';
 }
 
-function hasPreciseVisitDate(request: TourRequest) {
-    return getVisitDays(request).length > 0;
-}
-
-function isAwaitingConfirmation(request: TourRequest, phase: TourPhase) {
-    if (
-        request.status === 'confirme' ||
-        request.status === 'termine' ||
-        request.status === 'annule' ||
-        phase === 'cancelled' ||
-        phase === 'finished'
-    ) {
-        return false;
-    }
-    if (request.status === 'email_envoye') {
-        return phase !== 'ongoing' || !hasPreciseVisitDate(request);
-    }
-    return !hasPreciseVisitDate(request);
-}
-
-function isConfirmedUpcoming(request: TourRequest, phase: TourPhase) {
-    return request.status === 'confirme' && phase === 'upcoming';
-}
-
-function isOnVisitNow(request: TourRequest, phase: TourPhase) {
-    if (phase !== 'ongoing' || request.status === 'annule') return false;
-    return request.status === 'confirme' || hasPreciseVisitDate(request);
-}
-
 const PHASE_LABEL: Record<TourPhase, { label: string; className: string }> = {
     upcoming: { label: 'À venir', className: 'bg-blue-100 text-blue-900' },
     ongoing: { label: 'En visite', className: 'bg-emerald-100 text-emerald-900' },
     finished: { label: 'Tour fini', className: 'bg-slate-200 text-slate-800' },
     cancelled: { label: 'Annulé', className: 'bg-red-100 text-red-800' },
-};
-
-const PHASE_ORDER: Record<TourPhase, number> = {
-    ongoing: 0,
-    upcoming: 1,
-    finished: 2,
-    cancelled: 3,
 };
 
 const GUIDE_WAITLIST_MARKER = /Liste d['’]attente guides|Commande guide PDF/i;
@@ -587,11 +621,12 @@ export default function AdminChongqing() {
                 .eq('id', id);
 
             if (updateError) {
-                const extra =
-                    newStatus === 'termine'
-                        ? '\n\nColle ceci dans Supabase → SQL Editor, puis réessaie :\n\nALTER TABLE tour_requests DROP CONSTRAINT IF EXISTS tour_requests_status_check;\nALTER TABLE tour_requests ADD CONSTRAINT tour_requests_status_check CHECK (status IN (\'nouveau\', \'en_cours\', \'email_envoye\', \'confirme\', \'termine\', \'annule\'));'
-                        : '';
-                alert('Erreur: ' + updateError.message + extra);
+                alert(
+                    'Erreur: ' +
+                        updateError.message +
+                        '\n\nColle ceci dans Supabase → SQL Editor, puis réessaie :\n\n' +
+                        STATUS_CHECK_SQL
+                );
                 return;
             }
 
@@ -706,90 +741,70 @@ export default function AdminChongqing() {
     const enriched = useMemo(() => {
         return requests.map((request) => {
             const headcount = getHeadcount(request);
-            const pricing = getPricing(headcount.count);
+            const pricing = getPricing(headcount.count, getVisitDays(request).length);
             const phase = getTourPhase(request);
-            const payment = getPaymentState(request, pricing, phase);
+            const payment = getPaymentState(request, pricing);
             return { request, headcount, pricing, phase, payment };
         });
     }, [requests]);
 
     const stats = useMemo(() => {
-        const active = enriched.filter((item) => item.phase !== 'cancelled');
-        const toConfirm = active.filter((item) =>
-            isAwaitingConfirmation(item.request, item.phase)
-        );
-        const upcoming = active.filter((item) =>
-            isConfirmedUpcoming(item.request, item.phase)
-        );
-        const ongoing = active.filter((item) =>
-            isOnVisitNow(item.request, item.phase)
-        );
-        const finishedPeople = active.filter((item) => item.phase === 'finished');
-        const finishedPaid = active.filter(
-            (item) =>
-                item.request.status === 'termine' ||
-                (item.request.status === 'confirme' && item.phase === 'finished')
-        );
-        const confirmedToDo = active.filter(
-            (item) => item.request.status === 'confirme' && item.phase !== 'finished'
-        );
-        const hypothetical = active.filter(
-            (item) =>
-                item.request.status !== 'confirme' &&
-                item.request.status !== 'termine' &&
-                item.request.status !== 'annule'
-        );
+        const byStatus = (status: StatusType) =>
+            enriched.filter((item) => normalizeStatus(item.request.status) === status);
+        const pipeline = enriched.filter((item) => {
+            const status = normalizeStatus(item.request.status);
+            return status === 'nouveau' || status === 'en_cours' || status === 'email_envoye';
+        });
+        const confirmed = byStatus('confirme');
+        const ongoing = byStatus('tour_en_cours');
+        const finished = byStatus('termine');
+        const billed = [...confirmed, ...ongoing, ...finished];
+        const outstandingItems = [...confirmed, ...ongoing];
 
-        const sumPeople = (items: typeof active) =>
+        const sumPeople = (items: typeof enriched) =>
             items.reduce((acc, item) => acc + item.headcount.count, 0);
-        const sumTotal = (items: typeof active) =>
+        const sumTotal = (items: typeof enriched) =>
             items.reduce((acc, item) => acc + item.pricing.total, 0);
-        const sumCollected = (items: typeof active) =>
+        const sumCollected = (items: typeof enriched) =>
             items.reduce((acc, item) => acc + item.payment.collected, 0);
-        const sumOutstanding = (items: typeof active) =>
+        const sumOutstanding = (items: typeof enriched) =>
             items.reduce((acc, item) => acc + item.payment.outstanding, 0);
 
-        const projectionFinished = sumTotal(finishedPaid);
-        const projectionToDo = sumTotal(confirmedToDo);
-        const projectionHypothetical = sumTotal(hypothetical);
+        const projectionFinished = sumTotal(finished);
+        const projectionToDo = sumTotal(outstandingItems);
+        const projectionHypothetical = sumTotal(pipeline);
 
         return {
-            peopleToConfirm: sumPeople(toConfirm),
-            toursToConfirm: toConfirm.length,
-            peopleUpcoming: sumPeople(upcoming),
-            toursUpcoming: upcoming.length,
+            peopleToConfirm: sumPeople(pipeline),
+            toursToConfirm: pipeline.length,
+            peopleUpcoming: sumPeople(confirmed),
+            toursUpcoming: confirmed.length,
             peopleOngoing: sumPeople(ongoing),
             toursOngoing: ongoing.length,
-            peopleFinished: sumPeople(finishedPeople),
-            toursFinished: finishedPeople.length,
+            peopleFinished: sumPeople(finished),
+            toursFinished: finished.length,
             projection: projectionFinished + projectionToDo,
             projectionFinished,
             projectionToDo,
             projectionHypothetical,
-            collected: sumCollected(active),
-            outstanding: sumOutstanding(confirmedToDo),
+            collected: sumCollected(billed),
+            outstanding: sumOutstanding(outstandingItems),
         };
     }, [enriched]);
 
     const filtered = useMemo(() => {
-        const list = enriched.filter((item) => {
-            if (filter === 'a_confirmer') {
-                return isAwaitingConfirmation(item.request, item.phase);
-            }
-            if (filter === 'a_venir') {
-                return isConfirmedUpcoming(item.request, item.phase);
-            }
-            if (filter === 'en_visite') {
-                return isOnVisitNow(item.request, item.phase);
-            }
-            if (filter === 'termines') return item.phase === 'finished';
-            if (filter === 'annules') return item.phase === 'cancelled';
-            return true;
-        });
+        const list =
+            filter === 'tous'
+                ? enriched
+                : enriched.filter(
+                      (item) => normalizeStatus(item.request.status) === filter
+                  );
 
         return [...list].sort((a, b) => {
-            const phaseDiff = PHASE_ORDER[a.phase] - PHASE_ORDER[b.phase];
-            if (phaseDiff !== 0) return phaseDiff;
+            const statusDiff =
+                STATUS_ORDER[normalizeStatus(a.request.status)] -
+                STATUS_ORDER[normalizeStatus(b.request.status)];
+            if (filter === 'tous' && statusDiff !== 0) return statusDiff;
             const visitA = getVisitDays(a.request)[0];
             const visitB = getVisitDays(b.request)[0];
             const dateA =
@@ -832,6 +847,7 @@ export default function AdminChongqing() {
             'Participants listés',
             'Inscrit dans la liste',
             'Nb Personnes (tarif)',
+            'Nb jours (tarif)',
             'Total €',
             'Déjà encaissé €',
             'Reste à encaisser €',
@@ -868,6 +884,7 @@ export default function AdminChongqing() {
             headcount.listed,
             headcount.registrantInList ? 'Oui' : 'Non',
             headcount.count,
+            pricing.days,
             pricing.total,
             payment.collected,
             payment.outstanding,
@@ -910,15 +927,13 @@ export default function AdminChongqing() {
 
     const filters: { id: FilterType; label: string; count: number }[] = [
         { id: 'tous', label: 'Tous', count: enriched.length },
-        { id: 'a_confirmer', label: 'À confirmer', count: stats.toursToConfirm },
-        { id: 'a_venir', label: 'À venir', count: stats.toursUpcoming },
-        { id: 'en_visite', label: 'En visite', count: stats.toursOngoing },
-        { id: 'termines', label: 'Tours finis', count: stats.toursFinished },
-        {
-            id: 'annules',
-            label: 'Annulés',
-            count: enriched.filter((item) => item.phase === 'cancelled').length,
-        },
+        ...STATUS_VALUES.map((status) => ({
+            id: status,
+            label: STATUS_CONFIG[status].label,
+            count: enriched.filter(
+                (item) => normalizeStatus(item.request.status) === status
+            ).length,
+        })),
     ];
 
     return (
@@ -950,18 +965,18 @@ export default function AdminChongqing() {
                         label="À confirmer"
                         value={stats.peopleToConfirm}
                         unit="personnes"
-                        hint={`${stats.toursToConfirm} dossier${stats.toursToConfirm > 1 ? 's' : ''} sans confirmation`}
+                        hint={`${stats.toursToConfirm} dossier${stats.toursToConfirm > 1 ? 's' : ''} (nouveau / validation / email)`}
                         tone="amber"
                     />
                     <StatCard
-                        label="Personnes à venir"
+                        label="Confirmés"
                         value={stats.peopleUpcoming}
                         unit="personnes"
                         hint={`${stats.toursUpcoming} tour${stats.toursUpcoming > 1 ? 's' : ''} confirmé${stats.toursUpcoming > 1 ? 's' : ''}`}
                         tone="sky"
                     />
                     <StatCard
-                        label="En visite maintenant"
+                        label="Tour en cours"
                         value={stats.peopleOngoing}
                         unit="personnes"
                         hint={`${stats.toursOngoing} tour${stats.toursOngoing > 1 ? 's' : ''}`}
@@ -1055,8 +1070,9 @@ export default function AdminChongqing() {
                     </div>
                 ) : (
                     <div className="space-y-5">
-                        {filtered.map(({ request, headcount, pricing, phase, payment }) => {
+                        {filtered.map(({ request, headcount, pricing, payment }) => {
                             const statusConfig = getStatusConfig(request.status);
+                            const currentStatus = normalizeStatus(request.status);
                             const duration = stayDuration(
                                 request.date_arrivee,
                                 request.date_depart
@@ -1065,7 +1081,7 @@ export default function AdminChongqing() {
                             const visitDays = getVisitDays(request);
                             const expanded = expandedId === request.id;
                             const canMarkFinished =
-                                request.status !== 'termine' && request.status !== 'annule';
+                                currentStatus !== 'termine' && currentStatus !== 'annule';
 
                             return (
                                 <div
@@ -1090,11 +1106,6 @@ export default function AdminChongqing() {
                                                             className={`px-3 py-1.5 rounded-full font-bold text-sm ${statusConfig.bgColor} ${statusConfig.color}`}
                                                         >
                                                             {statusConfig.label}
-                                                        </span>
-                                                        <span
-                                                            className={`px-3 py-1.5 rounded-full font-bold text-sm ${PHASE_LABEL[phase].className}`}
-                                                        >
-                                                            {PHASE_LABEL[phase].label}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1151,7 +1162,7 @@ export default function AdminChongqing() {
                                                     icon={<Wallet size={18} />}
                                                     label="Total"
                                                     value={formatEuro(pricing.total)}
-                                                    extra={`${UNIT_PRICE} € × ${headcount.count}`}
+                                                    extra={`${UNIT_PRICE} € × ${headcount.count} pers. × ${pricing.days} j`}
                                                 />
                                                 <InfoChip
                                                     icon={<CheckCircle2 size={18} />}
@@ -1175,7 +1186,7 @@ export default function AdminChongqing() {
 
                                             <div
                                                 onClick={(e) => e.stopPropagation()}
-                                                className="bg-white border-2 border-ink/10 rounded-xl p-3"
+                                                className="bg-white border-2 border-apricot/40 rounded-xl p-3"
                                             >
                                                 <VisitDaysEditor
                                                     days={visitDays}
@@ -1216,31 +1227,32 @@ export default function AdminChongqing() {
                                                 <h4 className="font-bold text-ink text-lg mb-3">
                                                     Modifier le statut
                                                 </h4>
+                                                <p className="text-sm font-medium text-ink/70 mb-3">
+                                                    Nouveau → validation → email envoyé → confirmé → tour en cours → tour fini
+                                                </p>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {(Object.keys(STATUS_CONFIG) as StatusType[]).map(
-                                                        (status) => {
-                                                            const config = STATUS_CONFIG[status];
-                                                            return (
-                                                                <button
-                                                                    key={status}
-                                                                    onClick={() =>
-                                                                        updateStatus(request.id, status)
-                                                                    }
-                                                                    disabled={
-                                                                        updatingId === request.id ||
-                                                                        request.status === status
-                                                                    }
-                                                                    className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${
-                                                                        request.status === status
-                                                                            ? `${config.bgColor} ${config.color} ring-2 ring-offset-2 ring-ink/30`
-                                                                            : 'bg-ink/10 text-ink hover:bg-ink/15'
-                                                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                                                >
-                                                                    {config.label}
-                                                                </button>
-                                                            );
-                                                        }
-                                                    )}
+                                                    {STATUS_VALUES.map((status) => {
+                                                        const config = STATUS_CONFIG[status];
+                                                        const selected = currentStatus === status;
+                                                        return (
+                                                            <button
+                                                                key={status}
+                                                                onClick={() =>
+                                                                    updateStatus(request.id, status)
+                                                                }
+                                                                disabled={
+                                                                    updatingId === request.id || selected
+                                                                }
+                                                                className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all ${
+                                                                    selected
+                                                                        ? `${config.bgColor} ${config.color} ring-2 ring-offset-2 ring-ink/30`
+                                                                        : 'bg-ink/10 text-ink hover:bg-ink/15'
+                                                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                            >
+                                                                {config.label}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                                 {canMarkFinished && (
                                                     <button
@@ -1260,10 +1272,14 @@ export default function AdminChongqing() {
                                                 <h4 className="font-bold text-ink text-lg mb-3">
                                                     Tarif & encaissement
                                                 </h4>
-                                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                                                     <PriceBox
                                                         label="Personnes"
                                                         value={`${headcount.count}`}
+                                                    />
+                                                    <PriceBox
+                                                        label="Jours de visite"
+                                                        value={`${pricing.days}`}
                                                     />
                                                     <PriceBox
                                                         label="Total"
@@ -1282,8 +1298,12 @@ export default function AdminChongqing() {
                                                 <p className="mt-3 text-base font-semibold text-ink">
                                                     {payment.note}
                                                 </p>
-                                                {request.status === 'confirme' &&
-                                                    phase !== 'finished' && (
+                                                <p className="mt-2 text-sm font-medium text-ink/70">
+                                                    {UNIT_PRICE} € × {headcount.count} pers. × {pricing.days} jour
+                                                    {pricing.days > 1 ? 's' : ''}
+                                                </p>
+                                                {(currentStatus === 'confirme' ||
+                                                    currentStatus === 'tour_en_cours') && (
                                                         <p className="mt-2 text-sm font-medium text-ink/70">
                                                             Acompte 25 % : {formatEuro(pricing.deposit)} ·
                                                             Solde 75 % : {formatEuro(pricing.remaining)}
@@ -1477,9 +1497,8 @@ function padDatePart(value: number) {
 }
 
 function visitChipClass(status: StatusType) {
-    if (status === 'termine') return 'bg-slate-200 text-slate-800';
-    if (status === 'confirme') return 'bg-emerald-200 text-emerald-900';
-    return 'bg-amber-200 text-amber-900';
+    const config = STATUS_CONFIG[status];
+    return `${config.bgColor} ${config.color}`;
 }
 
 function VisitCalendar({
@@ -1505,14 +1524,14 @@ function VisitCalendar({
         >();
 
         for (const item of items) {
-            if (item.request.status === 'annule') continue;
+            if (normalizeStatus(item.request.status) === 'annule') continue;
             for (const day of getVisitDays(item.request)) {
                 const list = map.get(day) ?? [];
                 list.push({
                     id: item.request.id,
                     name: `${item.request.prenom} ${item.request.nom}`.trim(),
                     people: item.headcount.count,
-                    status: item.request.status,
+                    status: normalizeStatus(item.request.status),
                 });
                 map.set(day, list);
             }
@@ -1651,13 +1670,22 @@ function VisitCalendar({
 
             <div className="flex flex-wrap gap-3 mt-3 text-xs font-semibold text-ink/70">
                 <span className="inline-flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-400" /> Nouveau
+                </span>
+                <span className="inline-flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> Validation
+                </span>
+                <span className="inline-flex items-center gap-1">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-400" /> Email envoyé
+                </span>
+                <span className="inline-flex items-center gap-1">
                     <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Confirmé
                 </span>
                 <span className="inline-flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> À confirmer
+                    <span className="w-2.5 h-2.5 rounded-full bg-orange-400" /> Tour en cours
                 </span>
                 <span className="inline-flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Fini
+                    <span className="w-2.5 h-2.5 rounded-full bg-slate-400" /> Tour fini
                 </span>
             </div>
 
@@ -2076,12 +2104,12 @@ function VisitDaysEditor({
     onRemove: (day: string) => void;
 }) {
     const [draft, setDraft] = useState('');
-    const min = toIsoDate(arrivee) || undefined;
-    const max = toIsoDate(depart) || undefined;
     const sorted = [...days].sort();
+    const extraDay = nextExtraVisitDay(days, arrivee, depart);
+    const draftOutsideStay = Boolean(draft) && !isWithinStay(draft, arrivee, depart);
 
-    const addDay = () => {
-        const day = toIsoDate(draft);
+    const addDay = (value: string) => {
+        const day = toIsoDate(value);
         if (!day || days.includes(day) || disabled) return;
         onAdd(day);
         setDraft('');
@@ -2089,22 +2117,29 @@ function VisitDaysEditor({
 
     return (
         <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-ink/70 mb-2">
-                Ajouter le jour exact de la visite
+            <p className="text-sm font-bold uppercase tracking-wide text-ink/70">
+                Jours de visite guidée
             </p>
-            {sorted.length > 0 && (
+            <p className="text-sm font-medium text-ink/70 mb-2">
+                Tu peux en ajouter plusieurs — même si la personne n’en a réservé qu’un.
+            </p>
+            {sorted.length > 0 ? (
                 <div className="flex flex-wrap gap-2 mb-3">
                     {sorted.map((day) => (
                         <span
                             key={day}
-                            className="inline-flex items-center gap-2 bg-emerald-100 text-emerald-900 px-3 py-1.5 rounded-full font-bold text-sm"
+                            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full font-bold text-sm ${
+                                isWithinStay(day, arrivee, depart)
+                                    ? 'bg-emerald-100 text-emerald-900'
+                                    : 'bg-amber-100 text-amber-900'
+                            }`}
                         >
                             {formatLongDate(day)}
                             <button
                                 type="button"
                                 onClick={() => onRemove(day)}
                                 disabled={disabled}
-                                className="text-emerald-800 hover:text-red-600 disabled:opacity-50"
+                                className="hover:text-red-600 disabled:opacity-50"
                                 title="Retirer ce jour"
                             >
                                 <X size={16} />
@@ -2112,27 +2147,53 @@ function VisitDaysEditor({
                         </span>
                     ))}
                 </div>
+            ) : (
+                <p className="text-sm font-semibold text-amber-800 mb-3">
+                    Aucun jour de visite pour l’instant.
+                </p>
             )}
             <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                    type="button"
+                    onClick={() => extraDay && addDay(extraDay)}
+                    disabled={disabled || !extraDay}
+                    className="inline-flex items-center justify-center gap-2 bg-apricot text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-50"
+                >
+                    <Plus size={16} />
+                    {sorted.length === 0
+                        ? extraDay
+                            ? `Ajouter le 1er jour · ${formatLongDate(extraDay)}`
+                            : 'Ajouter le 1er jour'
+                        : extraDay
+                          ? `Ajouter un jour de plus · ${formatLongDate(extraDay)}`
+                          : 'Ajouter un jour de plus'}
+                </button>
                 <input
                     type="date"
                     value={draft}
-                    min={min}
-                    max={max}
                     onChange={(e) => setDraft(e.target.value)}
                     disabled={disabled}
                     className="border-2 border-ink/15 rounded-xl px-3 py-2 text-base font-medium text-ink w-full sm:w-auto"
                 />
                 <button
                     type="button"
-                    onClick={addDay}
+                    onClick={() => addDay(draft)}
                     disabled={disabled || !draft}
                     className="inline-flex items-center justify-center gap-2 bg-ink text-white px-4 py-2 rounded-xl font-bold text-sm hover:opacity-90 disabled:opacity-50"
                 >
                     <Plus size={16} />
-                    Ajouter ce jour
+                    Ajouter cette date
                 </button>
             </div>
+            {draftOutsideStay && (
+                <p className="text-xs font-medium text-amber-800 mt-2">
+                    Cette date est hors du séjour déclaré
+                    {arrivee || depart
+                        ? ` (${formatLongDate(arrivee || '')} → ${formatLongDate(depart || '')})`
+                        : ''}
+                    . Tu peux quand même l’ajouter.
+                </p>
+            )}
         </div>
     );
 }

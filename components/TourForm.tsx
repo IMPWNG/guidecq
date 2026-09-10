@@ -187,6 +187,7 @@ export default function TourForm({ locale, dict }: Props) {
                 rythme: form.rythme,
                 commentaires: form.commentaires,
                 option_voiture_privee: form.option_voiture_privee,
+                status: 'nouveau',
             },
         ])
 
