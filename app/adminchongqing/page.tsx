@@ -72,8 +72,15 @@ type StatusType = (typeof STATUS_VALUES)[number];
 type TourPhase = 'upcoming' | 'ongoing' | 'finished' | 'cancelled';
 type FilterType = 'tous' | StatusType;
 
-const STATUS_CHECK_SQL =
-    "ALTER TABLE tour_requests DROP CONSTRAINT IF EXISTS tour_requests_status_check;\nALTER TABLE tour_requests ALTER COLUMN status SET DEFAULT 'nouveau';\nALTER TABLE tour_requests ADD CONSTRAINT tour_requests_status_check CHECK (status IN ('nouveau', 'en_cours', 'email_envoye', 'confirme', 'tour_en_cours', 'termine', 'annule'));";
+const ADMIN_WRITE_SQL = `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.tour_requests TO anon, authenticated;
+DROP POLICY IF EXISTS tour_requests_update_all ON public.tour_requests;
+CREATE POLICY tour_requests_update_all ON public.tour_requests FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS tour_requests_delete_all ON public.tour_requests;
+CREATE POLICY tour_requests_delete_all ON public.tour_requests FOR DELETE TO anon, authenticated USING (true);
+ALTER TABLE public.tour_requests ADD COLUMN IF NOT EXISTS jours_visite date[] DEFAULT '{}';
+ALTER TABLE public.tour_requests DROP CONSTRAINT IF EXISTS tour_requests_status_check;
+ALTER TABLE public.tour_requests ALTER COLUMN status SET DEFAULT 'nouveau';
+ALTER TABLE public.tour_requests ADD CONSTRAINT tour_requests_status_check CHECK (status IN ('nouveau', 'en_cours', 'email_envoye', 'confirme', 'tour_en_cours', 'termine', 'annule'));`;
 
 const STATUS_CONFIG: Record<
     StatusType,
@@ -615,17 +622,18 @@ export default function AdminChongqing() {
     const updateStatus = async (id: string, newStatus: StatusType) => {
         setUpdatingId(id);
         try {
-            const { error: updateError } = await supabase
+            const { data, error: updateError } = await supabase
                 .from('tour_requests')
                 .update({ status: newStatus })
-                .eq('id', id);
+                .eq('id', id)
+                .select('id');
 
-            if (updateError) {
+            if (updateError || !data?.length) {
                 alert(
-                    'Erreur: ' +
-                        updateError.message +
+                    'La base n’a pas enregistré le statut' +
+                        (updateError ? ' : ' + updateError.message : '') +
                         '\n\nColle ceci dans Supabase → SQL Editor, puis réessaie :\n\n' +
-                        STATUS_CHECK_SQL
+                        ADMIN_WRITE_SQL
                 );
                 return;
             }
@@ -645,16 +653,18 @@ export default function AdminChongqing() {
         setUpdatingId(id);
         const sorted = [...new Set(days)].sort();
         try {
-            const { error: updateError } = await supabase
+            const { data, error: updateError } = await supabase
                 .from('tour_requests')
                 .update({ jours_visite: sorted })
-                .eq('id', id);
+                .eq('id', id)
+                .select('id');
 
-            if (updateError) {
+            if (updateError || !data?.length) {
                 alert(
-                    'Erreur: ' +
-                        updateError.message +
-                        '\n\nAjoute cette colonne dans Supabase si besoin :\nALTER TABLE tour_requests ADD COLUMN IF NOT EXISTS jours_visite date[] DEFAULT \'{}\';'
+                    'La base n’a pas enregistré les jours de visite' +
+                        (updateError ? ' : ' + updateError.message : '') +
+                        '\n\nColle ceci dans Supabase → SQL Editor, puis réessaie :\n\n' +
+                        ADMIN_WRITE_SQL
                 );
                 return;
             }
@@ -673,13 +683,19 @@ export default function AdminChongqing() {
     const deleteRequest = async (id: string) => {
         if (!confirm('Sûr de vouloir supprimer ?')) return;
 
-        const { error: deleteError } = await supabase
+        const { data, error: deleteError } = await supabase
             .from('tour_requests')
             .delete()
-            .eq('id', id);
+            .eq('id', id)
+            .select('id');
 
-        if (deleteError) {
-            alert('Erreur: ' + deleteError.message);
+        if (deleteError || !data?.length) {
+            alert(
+                'La base n’a pas supprimé la réservation' +
+                    (deleteError ? ' : ' + deleteError.message : '') +
+                    '\n\nColle ceci dans Supabase → SQL Editor, puis réessaie :\n\n' +
+                    ADMIN_WRITE_SQL
+            );
             return;
         }
 

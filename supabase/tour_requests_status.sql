@@ -1,9 +1,30 @@
--- Statuts des demandes de tour.
 -- À coller dans Supabase → SQL Editor → Run.
 --
--- Nouveau parcours :
--- nouveau → en_cours (validation) → email_envoye → confirme → tour_en_cours → termine
--- + annule
+-- 1) Autorise l’admin à ENREGISTRER (dates, statuts, suppression).
+--    Sans ça, l’écran change mais un refresh ramène l’ancienne valeur.
+-- 2) Ajoute le statut "tour_en_cours" et met "nouveau" par défaut.
+
+alter table public.tour_requests
+  add column if not exists jours_visite date[] default '{}';
+
+alter table public.tour_requests enable row level security;
+
+grant select, insert, update, delete on table public.tour_requests to anon, authenticated;
+
+drop policy if exists tour_requests_update_all on public.tour_requests;
+create policy tour_requests_update_all
+on public.tour_requests
+for update
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists tour_requests_delete_all on public.tour_requests;
+create policy tour_requests_delete_all
+on public.tour_requests
+for delete
+to anon, authenticated
+using (true);
 
 update public.tour_requests
 set status = 'nouveau'
