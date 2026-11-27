@@ -100,9 +100,6 @@ export default function StreetSelect({ locale, dict }: Props) {
                             />
                         </button>
                     </div>
-                    <a className="back is-boxed under-card" href={`${home}/avis`}>
-                        {dict.header.reviews}
-                    </a>
                 </div>
                 <div className="actions">
                     <button className="lock" type="button" disabled={!hover && !locked} onClick={confirm}>

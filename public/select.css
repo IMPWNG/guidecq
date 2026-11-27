@@ -469,13 +469,6 @@ body[data-guide] .line {
   color: var(--ink);
 }
 
-.back.is-boxed.under-card {
-  display: flex;
-  width: 100%;
-  margin-top: 0.75rem;
-  justify-content: center;
-}
-
 .home {
   display: flex;
   flex-direction: column;
@@ -635,7 +628,6 @@ body[data-guide] .line {
   .lock { width: 100%; }
   .actions { align-items: stretch; }
   .back { align-self: flex-start; }
-  .back.is-boxed.under-card { align-self: stretch; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
