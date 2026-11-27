@@ -118,12 +118,6 @@ body:not(.home) .stage:has(h1.is-prompt) {
   min-height: 0;
 }
 
-body:not(.home) .stage:has(h1.is-prompt) .line {
-  max-width: 36rem;
-  margin-inline: auto;
-  text-align: center;
-}
-
 body:not(.home) .stage:has(h1.is-prompt) + .pick {
   margin-top: 2rem;
 }
