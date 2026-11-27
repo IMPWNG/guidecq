@@ -60,9 +60,6 @@ export default function StreetSelect({ locale, dict }: Props) {
             <main>
                 <section className="stage" aria-live="polite">
                     <div className="stage-top">
-                        <p className="kicker" style={{ color: hover || locked ? ACCENT : undefined }}>
-                            {hover || locked ? street.tag : ''}
-                        </p>
                         <p className="tours">{hover || locked ? street.tours : ''}</p>
                     </div>
                     <h1 className={hover || locked ? undefined : 'is-prompt'} style={{ color: locked ? ACCENT : undefined }}>
@@ -98,7 +95,6 @@ export default function StreetSelect({ locale, dict }: Props) {
                     >
                         {MARK}
                         <strong>{street.name}</strong>
-                        <span>{street.tag}</span>
                         <em className="tours">{street.tours}</em>
                         <img
                             className="face"
