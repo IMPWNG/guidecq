@@ -4,7 +4,7 @@ const fr = {
     meta: {
         title: 'Mat — Le meilleur guide de Chongqing',
         description:
-            'Journées guidées sur mesure à Chongqing : histoire, culture, nourriture et regard local. 9h–16h, 85 € par personne. Guides à Chongqing en accès abonné, en français et en anglais.',
+            'Journées guidées sur mesure à Chongqing : histoire, culture, nourriture et regard local. 9h–16h, 100 € par personne. Guides à Chongqing en accès abonné, en français et en anglais.',
         formulaireTitle: 'Demander un tour — Mat, guide à Chongqing',
         formulaireDescription:
             'Quelques questions pour composer une journée à Chongqing autour de toi. Visites en général de 9h à 16h.',
@@ -50,8 +50,7 @@ const fr = {
         tag: 'Real 🥷',
         name: 'Mat',
         quote: 'Ask me anything you want, but don’t waste my time 🥷',
-        tours: 'Normal Tour · 85 €',
-        comingBike: 'Motorbike rental/tour is coming 🏍️',
+        tours: 'Tour · 100 € par personne / journée',
     },
     home: {
         eyebrow: 'Guide francophone & anglophone à Chongqing',
@@ -62,7 +61,7 @@ const fr = {
             'Ses coins préférés, sa nourriture, ses beaux points de vue et toutes les petites expériences qu’on ne trouve pas forcément dans les guides.',
         ctaPrimary: 'Préparer ma journée',
         ctaSecondary: 'Lire les retours',
-        metaLine: 'Journée type 9h–16h · 85 € par personne · Parcours sur mesure',
+        metaLine: 'Journée type 9h–16h · 100 € par personne · Parcours sur mesure',
         instagramHint: 'Scanne pour me suivre',
         instagramAria: 'Ouvrir Instagram @chongqingbarbermat',
         skillsTitle: 'Mon savoir-faire',
@@ -167,7 +166,7 @@ Merci encore ! À +`,
             },
             {
                 title: 'On part de 9h à 16h',
-                text: '85 € par personne, hors transport, repas et billets. Le solde se règle au début de la visite.',
+                text: '100 € par personne, hors transport, repas et billets. Le solde se règle au début de la visite.',
             },
         ],
         requestTitle: 'Demander un tour',
@@ -252,7 +251,7 @@ Merci encore ! À +`,
         hoursStrong: '9h à 16h',
         priceLabel: 'Tarif. ',
         priceText:
-            '85 € par personne pour une journée complète (hors transport, restauration et billets d’entrée). Acompte de 25 % pour confirmer, solde au début de la visite.',
+            '100 € par personne pour une journée complète (hors transport, restauration et billets d’entrée). Acompte de 25 % pour confirmer, solde au début de la visite.',
         back: 'Précédent',
         next: 'Suivant',
         submit: 'Envoyer ma demande',
@@ -416,7 +415,7 @@ const en = {
     meta: {
         title: 'Mat — The best Chongqing guide',
         description:
-            'Custom full-day tours in Chongqing: history, food, culture, and a local point of view. 9am–4pm, €85 per person. Subscriber guides to Chongqing, in English and French.',
+            'Custom full-day tours in Chongqing: history, food, culture, and a local point of view. 9am–4pm, €100 per person. Subscriber guides to Chongqing, in English and French.',
         formulaireTitle: 'Request a tour — Mat, Chongqing guide',
         formulaireDescription:
             'A few questions so I can build a Chongqing day around you. Tours usually run 9am–4pm.',
@@ -462,8 +461,7 @@ const en = {
         tag: 'Real 🥷',
         name: 'Mat',
         quote: 'Ask me anything you want, but don’t waste my time 🥷',
-        tours: 'Normal Tour · €85',
-        comingBike: 'Motorbike rental/tour is coming 🏍️',
+        tours: 'Tour · €100 per person / day',
     },
     home: {
         eyebrow: 'English- & French-speaking guide in Chongqing',
@@ -474,7 +472,7 @@ const en = {
             'Favorite corners, food, viewpoints, and the small experiences you will not find in a standard itinerary.',
         ctaPrimary: 'Plan my day',
         ctaSecondary: 'Read the reviews',
-        metaLine: 'Typical day 9am–4pm · €85 per person · Custom route',
+        metaLine: 'Typical day 9am–4pm · €100 per person · Custom route',
         instagramHint: 'Scan to follow me',
         instagramAria: 'Open Instagram @chongqingbarbermat',
         skillsTitle: 'How I guide',
@@ -579,7 +577,7 @@ Thank you again — speak soon`,
             },
             {
                 title: 'We go 9am to 4pm',
-                text: '€85 per person, excluding transport, meals, and tickets. The balance is paid at the start of the visit.',
+                text: '€100 per person, excluding transport, meals, and tickets. The balance is paid at the start of the visit.',
             },
         ],
         requestTitle: 'Request a tour',
@@ -664,7 +662,7 @@ Thank you again — speak soon`,
         hoursStrong: '9am to 4pm',
         priceLabel: 'Price. ',
         priceText:
-            '€85 per person for a full day (excluding transport, meals, and entrance tickets). 25% deposit to confirm, balance at the start of the visit.',
+            '€100 per person for a full day (excluding transport, meals, and entrance tickets). 25% deposit to confirm, balance at the start of the visit.',
         back: 'Back',
         next: 'Next',
         submit: 'Send my request',

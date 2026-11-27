@@ -4,7 +4,7 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Mat - Le Meilleur guide de Chongqing',
   description:
-    'Journées guidées sur mesure à Chongqing : histoire, culture, nourriture et regard local. 9h–16h, 85 € par personne.',
+    'Journées guidées sur mesure à Chongqing : histoire, culture, nourriture et regard local. 9h–16h, 100 € par personne.',
 }
 
 export const viewport: Viewport = {

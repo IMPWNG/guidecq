@@ -100,7 +100,6 @@ export default function StreetSelect({ locale, dict }: Props) {
                         <strong>{street.name}</strong>
                         <span>{street.tag}</span>
                         <em className="tours">{street.tours}</em>
-                        <p className="soon">{street.comingBike}</p>
                         <img
                             className="face"
                             alt=""

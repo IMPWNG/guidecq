@@ -19,7 +19,7 @@ import {
     X,
 } from 'lucide-react';
 
-const UNIT_PRICE = 85;
+const UNIT_PRICE = 100;
 const DEPOSIT_RATE = 0.25;
 
 interface Participant {
