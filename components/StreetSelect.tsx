@@ -65,7 +65,6 @@ export default function StreetSelect({ locale, dict }: Props) {
                     <h1 className={hover || locked ? undefined : 'is-prompt'} style={{ color: locked ? ACCENT : undefined }}>
                         {hover || locked ? street.name : street.prompt}
                     </h1>
-                    <p className="line">{hover || locked ? street.quote : ''}</p>
                     {locked ? <p className="stamp">{street.locked}</p> : null}
                     <img
                         className="stage-face"

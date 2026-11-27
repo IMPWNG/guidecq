@@ -50,7 +50,6 @@ const fr = {
         locked: 'Locked in',
         back: 'Retour',
         name: 'Mat',
-        quote: 'Ask me anything you want, but don’t waste my time 🥷',
         tours: 'Tour · 100 € par personne / journée',
     },
     home: {
@@ -462,7 +461,6 @@ const en = {
         locked: 'Locked in',
         back: 'Back',
         name: 'Mat',
-        quote: 'Ask me anything you want, but don’t waste my time 🥷',
         tours: 'Tour · €100 per person / day',
     },
     home: {
