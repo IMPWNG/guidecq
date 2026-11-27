@@ -51,7 +51,7 @@ export default function StreetHome({ locale, dict }: Props) {
                     >
                         {street.cta}
                     </a>
-                    <a className="back" href={`${home}/avis`}>
+                    <a className="back is-boxed" href={`${home}/avis`}>
                         {dict.header.reviews}
                     </a>
                 </div>

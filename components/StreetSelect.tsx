@@ -76,34 +76,39 @@ export default function StreetSelect({ locale, dict }: Props) {
                         hidden={!hover && !locked}
                     />
                 </section>
-                <div className="roster is-solo" role="listbox" aria-label={street.name}>
-                    <button
-                        type="button"
-                        className={`fighter${locked ? ' is-on' : ''}`}
-                        data-id="mat"
-                        role="option"
-                        aria-selected={hover || locked}
-                        style={{ ['--accent' as string]: ACCENT }}
-                        disabled={locked}
-                        onPointerEnter={() => {
-                            if (!locked) setHover(true)
-                        }}
-                        onPointerLeave={() => {
-                            if (!locked) setHover(false)
-                        }}
-                        onClick={confirm}
-                    >
-                        {MARK}
-                        <strong>{street.name}</strong>
-                        <em className="tours">{street.tours}</em>
-                        <img
-                            className="face"
-                            alt=""
-                            width="612"
-                            height="720"
-                            src="/guides/mat.png"
-                        />
-                    </button>
+                <div className="pick">
+                    <div className="roster is-solo" role="listbox" aria-label={street.name}>
+                        <button
+                            type="button"
+                            className={`fighter${locked ? ' is-on' : ''}`}
+                            data-id="mat"
+                            role="option"
+                            aria-selected={hover || locked}
+                            style={{ ['--accent' as string]: ACCENT }}
+                            disabled={locked}
+                            onPointerEnter={() => {
+                                if (!locked) setHover(true)
+                            }}
+                            onPointerLeave={() => {
+                                if (!locked) setHover(false)
+                            }}
+                            onClick={confirm}
+                        >
+                            {MARK}
+                            <strong>{street.name}</strong>
+                            <em className="tours">{street.tours}</em>
+                            <img
+                                className="face"
+                                alt=""
+                                width="612"
+                                height="720"
+                                src="/guides/mat.png"
+                            />
+                        </button>
+                    </div>
+                    <a className="back is-boxed under-card" href={`${home}/avis`}>
+                        {dict.header.reviews}
+                    </a>
                 </div>
                 <div className="actions">
                     <button className="lock" type="button" disabled={!hover && !locked} onClick={confirm}>
@@ -112,9 +117,6 @@ export default function StreetSelect({ locale, dict }: Props) {
                     <a className="back" href={home}>
                         <span className="arrow" aria-hidden="true" />
                         {street.back}
-                    </a>
-                    <a className="back" href={`${home}/avis`}>
-                        {dict.header.reviews}
                     </a>
                 </div>
             </main>

@@ -118,7 +118,7 @@ body:not(.home) .stage:has(h1.is-prompt) {
   min-height: 0;
 }
 
-body:not(.home) .stage:has(h1.is-prompt) + .roster {
+body:not(.home) .stage:has(h1.is-prompt) + .pick {
   margin-top: 2rem;
 }
 
@@ -263,6 +263,14 @@ body[data-guide] .line {
 .roster.is-solo {
   grid-template-columns: 1fr;
   max-width: 34rem;
+}
+
+.pick {
+  max-width: 34rem;
+}
+
+.pick .roster.is-solo {
+  max-width: none;
 }
 
 .fighter {
@@ -421,6 +429,27 @@ body[data-guide] .line {
 
 .back:hover .arrow { background: var(--lantern); }
 .back:hover .arrow::before { border-color: var(--ink); }
+
+.back.is-boxed {
+  box-sizing: border-box;
+  min-height: 2.4rem;
+  padding: 0 0.9rem;
+  border: 2px solid var(--lantern);
+  background: #1a2430;
+  color: var(--lantern);
+}
+
+.back.is-boxed:hover {
+  background: var(--lantern);
+  color: var(--ink);
+}
+
+.back.is-boxed.under-card {
+  display: flex;
+  width: 100%;
+  margin-top: 0.75rem;
+  justify-content: center;
+}
 
 .home {
   display: flex;
@@ -581,6 +610,7 @@ body[data-guide] .line {
   .lock { width: 100%; }
   .actions { align-items: stretch; }
   .back { align-self: flex-start; }
+  .back.is-boxed.under-card { align-self: stretch; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
