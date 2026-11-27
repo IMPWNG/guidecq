@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import DoorBoot from '@/components/DoorBoot'
 import PublicHeader from '@/components/PublicHeader'
 import TourForm from '@/components/TourForm'
 import { getDictionary } from '@/lib/dictionaries'
@@ -29,13 +30,15 @@ export default async function Formulaire({
     const dict = getDictionary(lang)
 
     return (
-        <div className="min-h-screen bg-cream">
+        <div>
+            <DoorBoot />
             <PublicHeader locale={lang} dict={dict.header} />
-            <main className="max-w-2xl mx-auto px-4 sm:px-6 py-10 sm:py-14">
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-ink mb-2">
-                    {dict.formulaire.title}
-                </h1>
-                <p className="text-ink/65 mb-8">{dict.formulaire.intro}</p>
+            <main>
+                <section className="stage">
+                    <p className="kicker">{dict.street.wordmark}</p>
+                    <h1 className="is-page">{dict.formulaire.title}</h1>
+                    <p className="line">{dict.formulaire.intro}</p>
+                </section>
                 <TourForm locale={lang} dict={dict.form} />
             </main>
         </div>

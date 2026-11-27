@@ -53,8 +53,7 @@ export default function MobileMenu({ locale, dict }: Props) {
     }
 
     const links = [
-        { href: `${home}#savoir-faire`, label: dict.tour },
-        { href: `${home}#avis`, label: dict.reviews },
+        { href: `${home}/select`, label: dict.request },
         { href: `${home}/guides`, label: dict.guides },
     ]
 
@@ -63,7 +62,7 @@ export default function MobileMenu({ locale, dict }: Props) {
             <button
                 ref={buttonRef}
                 type="button"
-                className="inline-flex items-center justify-center w-11 h-11 rounded-xl text-ink hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-apricot"
+                className="inline-flex items-center justify-center w-11 h-11 text-foam hover:bg-white/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lantern"
                 aria-expanded={open}
                 aria-controls={menuId}
                 aria-label={open ? dict.close : dict.menu}
@@ -73,10 +72,10 @@ export default function MobileMenu({ locale, dict }: Props) {
             </button>
 
             {open ? (
-                <div className="fixed inset-0 top-16 z-50">
+                <div className="fixed inset-0 top-[57px] z-50">
                     <button
                         type="button"
-                        className="absolute inset-0 bg-ink/40"
+                        className="absolute inset-0 bg-black/50"
                         aria-label={dict.close}
                         onClick={close}
                     />
@@ -86,7 +85,7 @@ export default function MobileMenu({ locale, dict }: Props) {
                         role="dialog"
                         aria-modal="true"
                         aria-label={dict.navLabel}
-                        className="relative bg-cream border-b border-ink/10 shadow-xl px-4 py-5 flex flex-col gap-1"
+                        className="relative bg-[#1a2430] border-b border-[#31404e] px-4 py-5 flex flex-col gap-1"
                     >
                         <nav aria-label={dict.navLabel} className="flex flex-col">
                             {links.map((link) => (
@@ -94,7 +93,7 @@ export default function MobileMenu({ locale, dict }: Props) {
                                     key={link.href}
                                     href={link.href}
                                     onClick={close}
-                                    className="flex items-center min-h-12 px-3 rounded-xl text-base font-semibold text-ink hover:bg-ink/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-apricot"
+                                    className="flex items-center min-h-12 px-3 text-base font-semibold text-foam hover:bg-white/5"
                                 >
                                     {link.label}
                                 </Link>
@@ -103,7 +102,7 @@ export default function MobileMenu({ locale, dict }: Props) {
                         <Link
                             href={`${home}/formulaire`}
                             onClick={close}
-                            className="mt-1 inline-flex items-center justify-center min-h-12 bg-ink text-white font-semibold rounded-full px-4 hover:bg-ink/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-apricot"
+                            className="lock mt-2"
                         >
                             {dict.request}
                         </Link>

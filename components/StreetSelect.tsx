@@ -1,0 +1,142 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import LanguageSwitcher from '@/components/LanguageSwitcher'
+import { openDoor, shutDoor } from '@/lib/door'
+import type { Dictionary } from '@/lib/dictionaries'
+import type { Locale } from '@/lib/i18n'
+
+const ACCENT = '#e23b22'
+const MARK = (
+    <svg className="mark" viewBox="0 0 132 48" aria-hidden="true">
+        <path d="M4 6L36 42M36 6L4 42M50 6L82 42M82 6L50 42M96 6L128 42M128 6L96 42" />
+    </svg>
+)
+
+type Props = {
+    locale: Locale
+    dict: Dictionary
+}
+
+export default function StreetSelect({ locale, dict }: Props) {
+    const router = useRouter()
+    const street = dict.street
+    const home = `/${locale}`
+    const [hover, setHover] = useState(false)
+    const [locked, setLocked] = useState(false)
+
+    useEffect(() => {
+        openDoor()
+        return () => {
+            delete document.body.dataset.guide
+        }
+    }, [])
+
+    useEffect(() => {
+        if (hover || locked) document.body.dataset.guide = 'mat'
+        else delete document.body.dataset.guide
+    }, [hover, locked])
+
+    const confirm = () => {
+        if (locked) return
+        setLocked(true)
+        shutDoor(ACCENT, () => {
+            router.push(`${home}/formulaire`)
+        })
+    }
+
+    return (
+        <>
+            <header className="bar">
+                <a className="wordmark" href={home}>
+                    {street.wordmark}
+                </a>
+                <div className="flex items-center gap-3">
+                    <p>{street.pick}</p>
+                    <LanguageSwitcher locale={locale} dict={dict.header} />
+                </div>
+            </header>
+            <main>
+                <section className="stage" aria-live="polite">
+                    <div className="stage-top">
+                        <p className="kicker" style={{ color: hover || locked ? ACCENT : undefined }}>
+                            {hover || locked ? street.tag : ''}
+                        </p>
+                        <p className="tours">{hover || locked ? street.tours : ''}</p>
+                    </div>
+                    <h1 className={hover || locked ? undefined : 'is-prompt'} style={{ color: locked ? ACCENT : undefined }}>
+                        {hover || locked ? street.name : street.prompt}
+                    </h1>
+                    <p className="line">{hover || locked ? street.quote : ''}</p>
+                    {locked ? <p className="stamp">{street.locked}</p> : null}
+                    <img
+                        className="stage-face"
+                        src="/guides/mat.png"
+                        alt=""
+                        width="612"
+                        height="720"
+                        hidden={!hover && !locked}
+                    />
+                </section>
+                <div className="roster is-solo" role="listbox" aria-label={street.name}>
+                    <button
+                        type="button"
+                        className={`fighter${locked ? ' is-on' : ''}`}
+                        data-id="mat"
+                        role="option"
+                        aria-selected={hover || locked}
+                        style={{ ['--accent' as string]: ACCENT }}
+                        disabled={locked}
+                        onPointerEnter={() => {
+                            if (!locked) setHover(true)
+                        }}
+                        onPointerLeave={() => {
+                            if (!locked) setHover(false)
+                        }}
+                        onClick={confirm}
+                    >
+                        {MARK}
+                        <strong>{street.name}</strong>
+                        <span>{street.tag}</span>
+                        <em className="tours">{street.tours}</em>
+                        <p className="soon">{street.comingBike}</p>
+                        <img
+                            className="face"
+                            alt=""
+                            width="612"
+                            height="720"
+                            src="/guides/mat.png"
+                        />
+                    </button>
+                </div>
+                <div className="actions">
+                    <button className="lock" type="button" disabled={!hover && !locked} onClick={confirm}>
+                        {street.lock}
+                    </button>
+                    <a className="back" href={home}>
+                        <span className="arrow" aria-hidden="true" />
+                        {street.back}
+                    </a>
+                </div>
+                <section className="services" aria-label={street.servicesLabel}>
+                    <div className="roster">
+                        {street.services.map((item) => (
+                            <button
+                                key={item}
+                                className="fighter is-soon"
+                                type="button"
+                                disabled
+                                style={{ ['--accent' as string]: 'var(--lantern)' }}
+                            >
+                                <span>{street.service}</span>
+                                <strong>{item}</strong>
+                                <p className="soon">{street.soon}</p>
+                            </button>
+                        ))}
+                    </div>
+                </section>
+            </main>
+        </>
+    )
+}

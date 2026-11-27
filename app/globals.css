@@ -1,27 +1,66 @@
 @import "tailwindcss";
 
 @theme {
-  --color-sunshine: #FFC94D;
-  --color-apricot: #FF9E5E;
+  --color-sunshine: #f0b429;
+  --color-apricot: #e23b22;
   --color-bamboo: #7BC96F;
   --color-sky: #5BC0EB;
-  --color-cream: #FFF9EE;
-  --color-ink: #3A3A3A;
+  --color-cream: #121820;
+  --color-ink: #f4f7f8;
+  --color-foam: #f4f7f8;
+  --color-chili: #e23b22;
+  --color-lantern: #f0b429;
+  --color-concrete: #8ea0ab;
+  --color-panel: #1a2430;
 
-  --font-sans: "Poppins", sans-serif;
+  --font-sans: Figtree, "Avenir Next", sans-serif;
+  --font-display: Syne, "Avenir Next", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 html {
   scroll-behavior: smooth;
 }
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 120%, #243140 0%, transparent 55%),
+    #121820;
+  color: #f4f7f8;
+  font-family: Figtree, "Avenir Next", sans-serif;
 }
 
-body {
-  background: var(--color-cream);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
+.theme-admin {
+  --color-sunshine: #FFC94D;
+  --color-apricot: #FF9E5E;
+  --color-cream: #FFF9EE;
+  --color-ink: #3A3A3A;
+  background: #FFF9EE;
+  color: #3A3A3A;
+  font-family: Figtree, "Avenir Next", sans-serif;
+}
+
+.sheet {
+  background: #1a2430;
+  border: 1px solid #31404e;
+}
+
+.sheet-input {
+  width: 100%;
+  border: 1px solid #31404e;
+  background: #121820;
+  color: #f4f7f8;
+  padding: 0.75rem 1rem;
+  font: inherit;
+}
+
+.sheet-input::placeholder {
+  color: #8ea0ab;
+}
+
+.sheet-input:focus {
+  outline: 2px solid #f0b429;
+  outline-offset: 2px;
 }

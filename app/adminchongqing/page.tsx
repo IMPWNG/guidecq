@@ -935,8 +935,8 @@ export default function AdminChongqing() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-cream">
-                <div className="text-xl font-semibold text-ink">Chargement...</div>
+            <div className="theme-admin flex items-center justify-center min-h-screen bg-cream">
+                <div className="theme-admin text-xl font-semibold text-ink">Chargement...</div>
             </div>
         );
     }
@@ -953,7 +953,7 @@ export default function AdminChongqing() {
     ];
 
     return (
-        <div className="min-h-screen bg-cream p-4 sm:p-8">
+        <div className="theme-admin min-h-screen bg-cream p-4 sm:p-8">
             <div className="max-w-7xl mx-auto">
                 <div className="mb-8">
                     <h1 className="text-3xl sm:text-4xl font-extrabold text-ink">

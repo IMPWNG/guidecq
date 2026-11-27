@@ -42,8 +42,7 @@ const initialForm = {
     option_voiture_privee: false,
 }
 
-const inputClass =
-    'border-2 border-ink/10 rounded-xl px-4 py-3 text-base w-full bg-white text-ink placeholder:text-ink/40 focus:outline-none focus:border-apricot'
+const inputClass = 'sheet-input'
 
 const LANGUAGE_VALUES = ['Français', 'Anglais', 'Chinois'] as const
 
@@ -203,18 +202,18 @@ export default function TourForm({ locale, dict }: Props) {
     }
 
     return (
-        <div className="bg-white rounded-3xl shadow-sm border border-ink/10 p-5 sm:p-8">
-            <p className="text-xs font-bold uppercase tracking-wide text-apricot mb-2">
+        <div className="sheet p-5 sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-wide text-lantern mb-2">
                 {dict.step} {step} {dict.of} {TOTAL_STEPS}
             </p>
             <ProgressBar step={step} total={TOTAL_STEPS} />
 
             {step === 1 && (
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-ink mb-2">
+                    <h2 className="text-xl sm:text-2xl font-extrabold mb-2">
                         {dict.step1Title}
                     </h2>
-                    <p className="text-sm text-ink/60 mb-5">{dict.step1Intro}</p>
+                    <p className="text-sm text-concrete mb-5">{dict.step1Intro}</p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <input
                             type="text"
@@ -250,10 +249,10 @@ export default function TourForm({ locale, dict }: Props) {
 
             {step === 2 && (
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-ink mb-2">
+                    <h2 className="text-xl sm:text-2xl font-extrabold mb-2">
                         {dict.step2Title}
                     </h2>
-                    <p className="text-sm text-ink/60 mb-5">{dict.step2Intro}</p>
+                    <p className="text-sm text-concrete mb-5">{dict.step2Intro}</p>
 
                     <div className="space-y-3 mb-5">
                         {form.participants.map((p, i) => (
@@ -330,7 +329,7 @@ export default function TourForm({ locale, dict }: Props) {
 
             {step === 3 && (
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-ink mb-5">
+                    <h2 className="text-xl sm:text-2xl font-extrabold mb-5">
                         {dict.step3Title}
                     </h2>
                     <div className="space-y-4">
@@ -390,7 +389,7 @@ export default function TourForm({ locale, dict }: Props) {
 
             {step === 4 && (
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-ink mb-2">
+                    <h2 className="text-xl sm:text-2xl font-extrabold mb-2">
                         {dict.step4Title}
                     </h2>
                     <p className="text-ink/60 mb-6 text-sm">{dict.step4Intro}</p>
@@ -447,7 +446,7 @@ export default function TourForm({ locale, dict }: Props) {
 
             {step === 5 && (
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-ink mb-5">
+                    <h2 className="text-xl sm:text-2xl font-extrabold mb-5">
                         {dict.step5Title}
                     </h2>
                     <div className="space-y-4">
@@ -478,7 +477,7 @@ export default function TourForm({ locale, dict }: Props) {
                                 className={inputClass}
                             />
                         </div>
-                        <div className="border-2 border-ink/10 rounded-2xl p-4 bg-cream">
+                        <div className="border border-[#31404e] p-4 bg-[#121820]">
                             <label className="flex items-start gap-3 cursor-pointer">
                                 <input
                                     type="checkbox"
@@ -531,7 +530,7 @@ export default function TourForm({ locale, dict }: Props) {
                         </div>
                     </div>
 
-                    <div className="bg-cream rounded-2xl p-4 text-sm text-ink/80 leading-relaxed mt-5 space-y-3">
+                    <div className="bg-[#121820] border border-[#31404e] p-4 text-sm text-concrete leading-relaxed mt-5 space-y-3">
                         <p>
                             <span className="font-bold text-ink">{dict.hoursLabel}</span>
                             {dict.hoursText}{' '}
@@ -562,7 +561,7 @@ export default function TourForm({ locale, dict }: Props) {
                     <button
                         type="button"
                         onClick={next}
-                        className="flex items-center gap-1 bg-ink hover:bg-ink/90 text-white font-semibold px-4 sm:px-6 py-3 rounded-xl transition text-sm sm:text-base"
+                        className="lock"
                     >
                         {dict.next} <ChevronRight size={18} />
                     </button>
@@ -571,7 +570,7 @@ export default function TourForm({ locale, dict }: Props) {
                         type="button"
                         onClick={handleSubmit}
                         disabled={loading}
-                        className="flex items-center gap-2 bg-apricot hover:bg-apricot/90 text-white font-semibold px-4 sm:px-6 py-3 rounded-xl transition text-sm sm:text-base"
+                        className="lock"
                     >
                         {loading && <Loader2 className="animate-spin" size={18} />}
                         {dict.submit}
@@ -607,7 +606,7 @@ export default function TourForm({ locale, dict }: Props) {
                         <button
                             type="button"
                             onClick={() => setErrorModal(null)}
-                            className="w-full bg-ink hover:bg-ink/90 text-white font-semibold px-6 py-3 rounded-xl transition"
+                            className="lock w-full"
                         >
                             {dict.understood}
                         </button>

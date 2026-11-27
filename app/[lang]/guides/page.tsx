@@ -38,23 +38,21 @@ export default async function GuidesPage({
     const g = dict.guides
 
     return (
-        <div className="min-h-screen bg-cream text-ink">
+        <div>
             <PublicHeader locale={lang} dict={dict.header} />
 
             <main>
-                <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-10 sm:pt-20 pb-10">
-                    <p className="text-sm font-bold uppercase tracking-[0.2em] text-apricot mb-4">
-                        {g.eyebrow}
-                    </p>
-                    <h1 className="text-3xl sm:text-5xl font-extrabold leading-[1.1] tracking-tight">
+                <section className="stage">
+                    <p className="kicker">{g.eyebrow}</p>
+                    <h1 className="is-page">
                         {g.title}
-                        <span className="block text-ink/50">{g.titleAccent}</span>
+                        <span className="block" style={{ color: 'var(--concrete)' }}>{g.titleAccent}</span>
                     </h1>
-                    <p className="mt-5 text-base sm:text-lg text-ink/70 leading-relaxed">{g.intro}</p>
+                    <p className="line" style={{ maxWidth: '40rem' }}>{g.intro}</p>
                 </section>
 
                 <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-10">
-                    <div className="rounded-[2rem] border border-ink/10 bg-white px-5 py-6 sm:px-8 sm:py-7">
+                    <div className="sheet px-5 py-6 sm:px-8 sm:py-7">
                         <h2 className="text-xl font-extrabold mb-4">{g.accessLabel}</h2>
                         <ul className="space-y-2.5">
                             {g.accessLines.map((line) => (
@@ -99,15 +97,12 @@ export default async function GuidesPage({
                 </section>
 
                 <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-20">
-                    <div className="rounded-[2rem] border border-ink/10 bg-white px-5 py-7 sm:px-10 sm:py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                    <div className="sheet px-5 py-7 sm:px-10 sm:py-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
                         <div>
                             <h2 className="text-xl font-extrabold mb-1">{g.tourCtaTitle}</h2>
-                            <p className="text-ink/65">{g.tourCtaText}</p>
+                            <p className="text-concrete">{g.tourCtaText}</p>
                         </div>
-                        <Link
-                            href={`/${lang}/formulaire`}
-                            className="bg-ink text-white font-semibold px-6 py-3 rounded-full hover:bg-ink/90 transition shrink-0 text-center"
-                        >
+                        <Link href={`/${lang}/select`} className="lock shrink-0 text-center">
                             {g.tourCtaButton}
                         </Link>
                     </div>
@@ -139,7 +134,7 @@ function GuideCard({
     extras: readonly string[]
 }) {
     return (
-        <article className="bg-white rounded-[2rem] border border-ink/10 p-5 sm:p-8">
+        <article className="sheet p-5 sm:p-8">
             <div className="flex items-center gap-3 mb-4">
                 <div className="w-11 h-11 rounded-2xl bg-ink/5 text-ink/70 flex items-center justify-center shrink-0">
                     {icon}

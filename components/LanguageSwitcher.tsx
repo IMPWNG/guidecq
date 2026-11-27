@@ -19,15 +19,15 @@ export default function LanguageSwitcher({ locale, dict }: Props) {
 
     return (
         <div
-            className="flex items-center h-9 rounded-full border border-ink/15 p-0.5 text-xs font-bold tracking-wide shrink-0"
+            className="flex items-center h-9 rounded-none border border-[#31404e] p-0.5 text-xs font-bold tracking-wide shrink-0"
             role="group"
             aria-label="Language"
         >
             <Link
                 href={replaceLocaleInPath(pathname, 'fr')}
                 onClick={() => persistLocale('fr')}
-                className={`px-2 sm:px-2.5 h-7 inline-flex items-center rounded-full transition ${
-                    locale === 'fr' ? 'bg-ink text-white' : 'text-ink/55 hover:text-ink'
+                className={`px-2 sm:px-2.5 h-7 inline-flex items-center transition ${
+                    locale === 'fr' ? 'bg-chili text-white' : 'text-concrete hover:text-foam'
                 }`}
                 aria-current={locale === 'fr' ? 'true' : undefined}
                 hrefLang="fr"
@@ -39,8 +39,8 @@ export default function LanguageSwitcher({ locale, dict }: Props) {
             <Link
                 href={replaceLocaleInPath(pathname, 'en')}
                 onClick={() => persistLocale('en')}
-                className={`px-2 sm:px-2.5 h-7 inline-flex items-center rounded-full transition ${
-                    locale === 'en' ? 'bg-ink text-white' : 'text-ink/55 hover:text-ink'
+                className={`px-2 sm:px-2.5 h-7 inline-flex items-center transition ${
+                    locale === 'en' ? 'bg-chili text-white' : 'text-concrete hover:text-foam'
                 }`}
                 aria-current={locale === 'en' ? 'true' : undefined}
                 hrefLang="en"

@@ -1,11 +1,5 @@
 import type { Metadata, Viewport } from 'next'
-import { Poppins } from 'next/font/google'
 import './globals.css'
-
-const poppins = Poppins({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-})
 
 export const metadata: Metadata = {
   title: 'Mat - Le Meilleur guide de Chongqing',
@@ -26,7 +20,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="fr" className="scroll-smooth" suppressHydrationWarning>
-      <body className={`${poppins.className} bg-cream text-ink min-h-screen`}>
+      <head>
+        <link rel="preload" href="/fonts/syne-700.woff2" as="font" type="font/woff2" crossOrigin="" />
+        <link rel="stylesheet" href="/select.css" />
+      </head>
+      <body>
+        <div id="door" aria-hidden="true" suppressHydrationWarning>
+          <div className="shutter" />
+        </div>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "try{if(sessionStorage.getItem('cq-door')&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.querySelector('#door').classList.add('is-shut','is-instant')}catch(e){}",
+          }}
+        />
         {children}
       </body>
     </html>
