@@ -119,23 +119,6 @@ export default function StreetSelect({ locale, dict }: Props) {
                         {street.back}
                     </a>
                 </div>
-                <section className="services" aria-label={street.servicesLabel}>
-                    <div className="roster">
-                        {street.services.map((item) => (
-                            <button
-                                key={item}
-                                className="fighter is-soon"
-                                type="button"
-                                disabled
-                                style={{ ['--accent' as string]: 'var(--lantern)' }}
-                            >
-                                <span>{street.service}</span>
-                                <strong>{item}</strong>
-                                <p className="soon">{street.soon}</p>
-                            </button>
-                        ))}
-                    </div>
-                </section>
             </main>
         </>
     )

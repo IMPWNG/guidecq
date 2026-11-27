@@ -52,14 +52,6 @@ const fr = {
         quote: 'Ask me anything you want, but don’t waste my time 🥷',
         tours: 'Normal Tour · 85 €',
         comingBike: 'Motorbike rental/tour is coming 🏍️',
-        servicesLabel: 'Services',
-        service: 'Service',
-        soon: 'Coming soon',
-        services: [
-            'Rent and ride a motorbike',
-            'Temporary Chinese driving license',
-            'Motorbike tour',
-        ],
     },
     home: {
         eyebrow: 'Guide francophone & anglophone à Chongqing',
@@ -472,14 +464,6 @@ const en = {
         quote: 'Ask me anything you want, but don’t waste my time 🥷',
         tours: 'Normal Tour · €85',
         comingBike: 'Motorbike rental/tour is coming 🏍️',
-        servicesLabel: 'Services',
-        service: 'Service',
-        soon: 'Coming soon',
-        services: [
-            'Rent and ride a motorbike',
-            'Temporary Chinese driving license',
-            'Motorbike tour',
-        ],
     },
     home: {
         eyebrow: 'English- & French-speaking guide in Chongqing',
