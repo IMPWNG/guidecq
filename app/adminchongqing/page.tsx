@@ -851,7 +851,7 @@ export default function AdminChongqing() {
             'Rythme',
             'Restrictions',
             'Langues',
-            'Voiture Privée',
+            'Option moto',
             'Déjà visité Chine',
             'Excursions',
             'Nature',
@@ -1377,7 +1377,7 @@ export default function AdminChongqing() {
                                                 <DetailBox title="Mobilité">
                                                     {request.mobilite || '—'}
                                                 </DetailBox>
-                                                <DetailBox title="Voiture privée">
+                                                <DetailBox title="Option moto">
                                                     {request.option_voiture_privee ? 'Oui' : 'Non'}
                                                 </DetailBox>
                                             </div>
