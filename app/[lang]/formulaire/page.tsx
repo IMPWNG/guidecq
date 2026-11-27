@@ -34,7 +34,7 @@ export default async function Formulaire({
             <DoorBoot />
             <PublicHeader locale={lang} dict={dict.header} />
             <main>
-                <section className="stage">
+                <section className="stage is-center">
                     <p className="kicker">{dict.street.wordmark}</p>
                     <h1 className="is-page">{dict.formulaire.title}</h1>
                     <p className="line">{dict.formulaire.intro}</p>

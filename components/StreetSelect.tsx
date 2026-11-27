@@ -8,11 +8,6 @@ import type { Dictionary } from '@/lib/dictionaries'
 import type { Locale } from '@/lib/i18n'
 
 const ACCENT = '#e23b22'
-const MARK = (
-    <svg className="mark" viewBox="0 0 132 48" aria-hidden="true">
-        <path d="M4 6L36 42M36 6L4 42M50 6L82 42M82 6L50 42M96 6L128 42M128 6L96 42" />
-    </svg>
-)
 
 type Props = {
     locale: Locale
@@ -93,7 +88,7 @@ export default function StreetSelect({ locale, dict }: Props) {
                             }}
                             onClick={confirm}
                         >
-                            {MARK}
+                            <span className="handle">@chongqingbarber.mat</span>
                             <strong>{street.name}</strong>
                             <em className="tours">{street.tours}</em>
                             <img

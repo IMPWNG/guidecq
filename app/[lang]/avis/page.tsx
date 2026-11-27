@@ -35,7 +35,7 @@ export default async function AvisPage({
             <DoorBoot />
             <PublicHeader locale={lang} dict={dict.header} />
             <main>
-                <section className="stage">
+                <section className="stage is-center">
                     <p className="kicker">{dict.home.reviewsEyebrow}</p>
                     <h1 className="is-page">{dict.home.reviewsTitle}</h1>
                     <p className="line">{dict.home.reviewsIntro}</p>
@@ -44,13 +44,12 @@ export default async function AvisPage({
                     {dict.home.reviews.map((review) => (
                         <li key={review.name}>
                             <figure className="voice">
+                                <figcaption>
+                                    <span>{review.name}</span>
+                                </figcaption>
                                 <blockquote>
                                     <p>{review.quote}</p>
                                 </blockquote>
-                                <figcaption>
-                                    {review.name}
-                                    {'theme' in review && review.theme ? ` · ${review.theme}` : ''}
-                                </figcaption>
                             </figure>
                         </li>
                     ))}
