@@ -18,6 +18,9 @@ export default function PublicHeader({ locale, dict }: Props) {
                 Chongqing Tour
             </Link>
             <nav className="hidden md:flex items-center gap-5" aria-label={dict.navLabel}>
+                <Link href={`${home}/avis`} className="back" style={{ margin: 0 }}>
+                    {dict.reviews}
+                </Link>
                 <Link href={`${home}/guides`} className="back" style={{ margin: 0 }}>
                     {dict.guides}
                 </Link>

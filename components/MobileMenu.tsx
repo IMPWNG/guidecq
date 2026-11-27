@@ -54,6 +54,7 @@ export default function MobileMenu({ locale, dict }: Props) {
 
     const links = [
         { href: `${home}/select`, label: dict.request },
+        { href: `${home}/avis`, label: dict.reviews },
         { href: `${home}/guides`, label: dict.guides },
     ]
 

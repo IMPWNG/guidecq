@@ -113,6 +113,9 @@ export default function StreetSelect({ locale, dict }: Props) {
                         <span className="arrow" aria-hidden="true" />
                         {street.back}
                     </a>
+                    <a className="back" href={`${home}/avis`}>
+                        {dict.header.reviews}
+                    </a>
                 </div>
             </main>
         </>

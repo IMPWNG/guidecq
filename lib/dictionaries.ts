@@ -16,6 +16,8 @@ const fr = {
         membreTitle: 'Tes guides — Mat, Chongqing',
         membreDescription: 'Accès membre aux guides de Chongqing, à garder sur ton téléphone.',
         paiementTitle: 'Payer les guides — Mat, Chongqing',
+        avisTitle: 'Avis — Mat, guide à Chongqing',
+        avisDescription: 'Ce que les gens disent après une journée à Chongqing avec Mat.',
     },
     header: {
         brand: 'Mat',
@@ -426,6 +428,8 @@ const en = {
         membreTitle: 'Your guides — Mat, Chongqing',
         membreDescription: 'Member access to the Chongqing guides, to keep on your phone.',
         paiementTitle: 'Pay for the guides — Mat, Chongqing',
+        avisTitle: 'Reviews — Mat, Chongqing guide',
+        avisDescription: 'What people say after a day in Chongqing with Mat.',
     },
     header: {
         brand: 'Mat',

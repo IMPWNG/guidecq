@@ -670,6 +670,40 @@ body[data-guide] .line {
 
 #door.is-instant .shutter { transition: none; }
 
+.voices {
+  list-style: none;
+  margin: 2rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.voice {
+  margin: 0;
+  padding: 1.15rem 1.2rem 1.25rem;
+  border: 1px solid #31404e;
+  background: #1a2430;
+}
+
+.voice blockquote {
+  margin: 0;
+}
+
+.voice p {
+  margin: 0;
+  white-space: pre-line;
+  line-height: 1.55;
+}
+
+.voice figcaption {
+  margin-top: 1rem;
+  color: var(--lantern);
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shutter { transition: none; }
   .cast-line,
