@@ -50,6 +50,7 @@ const fr = {
         locked: 'Locked in',
         back: 'Retour',
         name: 'Mat',
+        bio: 'Je vis à Chongqing depuis 2 ans et je connais bien la ville et ses petits coins cachés. Que ce soit pour la photo, des endroits insolites ou juste un food tour, je suis là pour vous.',
         tours: 'Tour · 100 € par personne / journée',
     },
     home: {
@@ -461,6 +462,7 @@ const en = {
         locked: 'Locked in',
         back: 'Back',
         name: 'Mat',
+        bio: 'I’ve lived in Chongqing for 2 years and I know the city and its hidden corners well. Photos, unusual spots, or just a food tour — I’m here for you.',
         tours: 'Tour · €100 per person / day',
     },
     home: {
